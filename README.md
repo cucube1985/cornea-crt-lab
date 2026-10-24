@@ -2,6 +2,10 @@
 
 한국어 각막 / CRT 렌즈 교육용 3D 기하 탐색기. 빌드 과정 없이 동작하는 정적 ES module 웹 앱입니다.
 
+## 온라인
+
+https://cucube1985.github.io/cornea-crt-lab/
+
 ## 실행
 
 Node.js가 설치된 상태에서 이 디렉터리에서 `npm start` 실행 후 http://127.0.0.1:4173 에 접속합니다. ES module과 WebGL을 사용하므로 HTML을 파일 탐색기에서 직접 여는 대신 HTTP로 실행합니다. 배포 파일은 `dist/`에 있습니다. Three.js 0.170.0은 로컬 vendor에 포함하고 MIT 라이선스를 동봉했습니다. 폰트는 Google Fonts에서 로드하며 오프라인에서는 시스템 폰트로 표시합니다.
