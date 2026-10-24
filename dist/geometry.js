@@ -22,6 +22,25 @@ export const defaultParams = Object.freeze({
   clearance: 0.002,
   autoSeat: true,
   seatTarget: 2,
+  hvid: 11.8,
+  vvid: 11.8,
+  qFlat: null,
+  qSteep: null,
+  sag8Flat: null,
+  sag8Steep: null,
+  sag10Flat: null,
+  sag10Steep: null,
+  asymNT: 0,
+  asymSI: 0,
+  eye: 'OD',
+  pupilDay: 3.5,
+  pupilNight: 5.5,
+  pupilX: 0,
+  pupilY: 0,
+  pupilLight: 'night',
+  treatmentDiameter: null,
+  treatmentX: 0,
+  treatmentY: 0,
 });
 
 export const modelAssumptions = Object.freeze({
@@ -31,7 +50,10 @@ export const modelAssumptions = Object.freeze({
   returnOuterRadius: 4,
   edgeWidth: 0.35,
   edgeLift: 0.025,
-  cornea: 'Biconic anterior surface with orthogonal principal axes and one assumed Q.',
+  cornea: 'Biconic anterior surface with meridional Q; optional 8/10 mm opposite-meridian mean sag constraints and synthetic smooth asymmetry. HVID/VVID clip the surface. Sparse input is not measured full topography.',
+  peripheral: 'C2 radial smootherstep adjusts sagittal depth at radii 4 and 5 mm while preserving central curvature; missing constraints use the analytic base surface.',
+  asymmetry: 'Additional anterior elevation N-minus-T and S-minus-I at radius 4 mm, cubic in radius; not a decentration predictor.',
+  pupil: 'Measured entrance pupil projected onto the corneal coordinate plane; no optical refraction or HOA simulation. Treatment zone is separately supplied, never equated to BC diameter.',
   returnZone: 'C2 quintic interpolation; sag increases by RZD/1000 between radii 3 and 4 mm.',
   landingZone: 'Straight radial tangent with slope tan(abs(LZA)); final 0.35 mm has 25 µm assumed edge lift.',
   seating: 'Vertical translation only to sampled minimum gap; no tear, pressure, flexure, motion, or remodeling model.',
@@ -52,6 +74,11 @@ export function normalizeParams(input = {}) {
   for (const key of ['flatK', 'steepK', 'steepAxis', 'q', 'bc', 'rzd', 'lza', 'diameter', 'offsetX', 'offsetY', 'tiltX', 'tiltY', 'clearance', 'seatTarget']) {
     p[key] = finite(p[key], defaultParams[key]);
   }
+  for (const key of ['hvid','vvid','asymNT','asymSI','pupilDay','pupilNight','pupilX','pupilY','treatmentX','treatmentY']) p[key]=finite(p[key],defaultParams[key]);
+  for (const key of ['qFlat','qSteep','sag8Flat','sag8Steep','sag10Flat','sag10Steep','treatmentDiameter']) p[key]=p[key]===null||p[key]===''||p[key]===undefined?null:finite(p[key],null);
+  p.eye=p.eye==='OS'?'OS':'OD';p.pupilLight=p.pupilLight==='day'?'day':'night';
+  if(p.hvid<8||p.hvid>15||p.vvid<8||p.vvid>15)throw new RangeError('Corneal diameters must be 8–15 mm.');
+  if([p.q,p.qFlat??p.q,p.qSteep??p.q].some(q=>q< -1.5||q>.5))throw new RangeError('Q must be between -1.5 and 0.5.');
   if (p.flatK <= 0 || p.steepK <= 0) throw new RangeError('K must be positive dioptres.');
   if (p.bc <= 3) throw new RangeError('BC must exceed the 3 mm optic-zone radius.');
   if (p.rzd <= 0) throw new RangeError('RZD must be positive micrometres.');
@@ -62,6 +89,9 @@ export function normalizeParams(input = {}) {
   if (p.flatK > p.steepK) {
     [p.flatK, p.steepK] = [p.steepK, p.flatK];
     p.steepAxis += 90;
+    [p.qFlat,p.qSteep]=[p.qSteep,p.qFlat];
+    [p.sag8Flat,p.sag8Steep]=[p.sag8Steep,p.sag8Flat];
+    [p.sag10Flat,p.sag10Steep]=[p.sag10Steep,p.sag10Flat];
     p.axesSwapped = true;
   }
   p.steepAxis = axis180(p.steepAxis);
@@ -84,8 +114,8 @@ function compile(input) {
   // Quintic endpoint constraints: value, first derivative and second derivative.
   const a = p.rzd / 1000 - m0 - c0 / 2;
   const b = m1 - m0 - c0;
-  const c = -c0;
-  return {
+  const endCurvature = -c0;
+  const c = {
     p, radius,
     rf: 337.5 / p.flatK,
     rs: 337.5 / p.steepK,
@@ -94,21 +124,75 @@ function compile(input) {
     sx: Math.tan(p.tiltX * DEG),
     sy: Math.tan(p.tiltY * DEG),
     y0, m0, c0, m1,
-    a3: 10 * a - 4 * b + c / 2,
-    a4: -15 * a + 7 * b - c,
-    a5: 6 * a - 3 * b + c / 2,
+    a3: 10 * a - 4 * b + endCurvature / 2,
+    a4: -15 * a + 7 * b - endCurvature,
+    a5: 6 * a - 3 * b + endCurvature / 2,
     edgeStart: radius - modelAssumptions.edgeWidth,
   };
+  c.qf=p.qFlat??p.q;c.qs=p.qSteep??p.q;
+  const baseSag=(r,steep)=>{
+    const rr=steep?c.rs:c.rf,q=steep?c.qs:c.qf;
+    return r*r/rr/(1+Math.sqrt(1-(1+q)*r*r/(rr*rr)));
+  };
+  c.corrections={};
+  for(const [r,chord] of [[4,8],[5,10]])for(const [axis,steep] of [['Flat',false],['Steep',true]]){
+    const input=p[`sag${chord}${axis}`];c.corrections[`${r}${axis}`]=input===null?null:input/1000-baseSag(r,steep);
+  }
+  return c;
 }
 
 function corneaAt(x, y, c) {
+  if((x/(c.p.hvid/2))**2+(y/(c.p.vvid/2))**2>1+1e-9)return NaN;
   const v = x * c.cos + y * c.sin; // steep principal meridian
   const u = -x * c.sin + y * c.cos; // flat principal meridian
   const uf = u / c.rf;
   const vs = v / c.rs;
-  const radicand = 1 - (1 + c.p.q) * (uf * uf + vs * vs);
+  const radicand = 1 - (1+c.qf)*uf*uf-(1+c.qs)*vs*vs;
   if (radicand < 0) return NaN;
-  return -(u * uf + v * vs) / (1 + Math.sqrt(radicand));
+  let z=-(u*uf+v*vs)/(1+Math.sqrt(radicand));
+  const r=Math.hypot(x,y);
+  if(r>0){
+    const correction=axis=>{
+      const d4=c.corrections[`4${axis}`]??0;
+      const d5=c.corrections[`5${axis}`]??d4;
+      return r<=4?d4*smootherstep(r/4):d4+(d5-d4)*smootherstep(r-4);
+    };
+    z-=(u*u*correction('Flat')+v*v*correction('Steep'))/(r*r);
+    const nasalSign=c.p.eye==='OD'?1:-1;
+    z+=(c.p.asymNT*nasalSign*x+c.p.asymSI*y)*r*r/(128*1000);
+  }
+  return z;
+}
+
+/** Compile once for dense rendering; all coordinates remain in millimetres. */
+export function createGeometrySampler(p=defaultParams){const c=compile(p);return{corneaZ:(x,y)=>corneaAt(x,y,c),lensZ:(x,y)=>lensAt(x,y,c),lensSag:r=>sagAt(r,c)};}
+
+/** Circle intersection fraction, independent of the corneal fitting model. */
+export function circleOverlapFraction(pupilRadius,zoneRadius,distance){
+  const r=pupilRadius,R=zoneRadius,d=Math.abs(distance);
+  if(!(r>0&&R>0&&Number.isFinite(d)))return NaN;
+  if(d>=r+R)return 0;
+  if(d<=Math.abs(R-r))return Math.min(r,R)**2/r**2;
+  const clamp=x=>Math.max(-1,Math.min(1,x));
+  const a=r*r*Math.acos(clamp((d*d+r*r-R*R)/(2*d*r)))+R*R*Math.acos(clamp((d*d+R*R-r*r)/(2*d*R)))-.5*Math.sqrt(Math.max(0,(-d+r+R)*(d+r-R)*(d-r+R)*(d+r+R)));
+  return Math.max(0,Math.min(1,a/(Math.PI*r*r)));
+}
+
+export function anteriorMetrics(input={}){
+  const c=compile(input),p=c.p;
+  const meanSag=(r,angle)=>{const t=angle*DEG;const a=corneaAt(r*Math.cos(t),r*Math.sin(t),c),b=corneaAt(-r*Math.cos(t),-r*Math.sin(t),c);return -(a+b)*500;};
+  const sag8Flat=meanSag(4,p.flatAxis),sag8Steep=meanSag(4,p.steepAxis);
+  const nasal=p.eye==='OD'?1:-1;
+  const pupilDiameter=p.pupilLight==='day'?p.pupilDay:p.pupilNight;
+  const zoneDistance=Math.hypot(p.pupilX-p.treatmentX,p.pupilY-p.treatmentY);
+  return {hvid:p.hvid,vvid:p.vvid,lensToHvid:p.diameter/p.hvid,centeredHorizontalMargin:(p.hvid-p.diameter)/2,
+    qFlat:c.qf,qSteep:c.qs,sag8Flat,sag8Steep,ced8:sag8Steep-sag8Flat,
+    sag10Flat:meanSag(5,p.flatAxis),sag10Steep:meanSag(5,p.steepAxis),
+    asymNT:(corneaAt(nasal*4,0,c)-corneaAt(-nasal*4,0,c))*1000,
+    asymSI:(corneaAt(0,4,c)-corneaAt(0,-4,c))*1000,
+    pupilDiameter,pupilToVertex:Math.hypot(p.pupilX,p.pupilY),pupilToLens:Math.hypot(p.pupilX-p.offsetX,p.pupilY-p.offsetY),
+    pupilToTreatment:p.treatmentDiameter===null?null:zoneDistance,
+    pupilOverlap:p.treatmentDiameter===null?null:circleOverlapFraction(pupilDiameter/2,p.treatmentDiameter/2,zoneDistance)};
 }
 
 function sagAt(r, c) {
@@ -247,8 +331,7 @@ export function sampleFit(input = {}, options = {}) {
     const theta = angle * DEG;
     return [1, -1].map(sign => at(c.p.offsetX + sign * referenceRadius * Math.cos(theta), c.p.offsetY + sign * referenceRadius * Math.sin(theta)).gap).reduce((a, b) => a + b, 0) / 2;
   };
-  const flatAt4 = corneaAt(-4 * c.sin, 4 * c.cos, c);
-  const steepAt4 = corneaAt(4 * c.cos, 4 * c.sin, c);
+  const anterior=anteriorMetrics(c.p);
   const metrics = {
     minGap: (minBaseGap + c.p.clearance) * 1000,
     maxGap: (maxBaseGap + c.p.clearance) * 1000,
@@ -266,7 +349,7 @@ export function sampleFit(input = {}, options = {}) {
     asymmetryRadius: referenceRadius,
     flatGap: principalGap(c.p.flatAxis),
     steepGap: principalGap(c.p.steepAxis),
-    elevationDifference: (flatAt4 - steepAt4) * 1000,
+    elevationDifference: anterior.ced8,
     decentration: Math.hypot(c.p.offsetX, c.p.offsetY),
     coverageFraction: samples.length / footprintCount,
     minGapLocation: finish(minRaw),
@@ -291,5 +374,6 @@ export function sampleFit(input = {}, options = {}) {
     grid: { size, step, originX, originY, values, samples },
     meridians: { flat: meridian(c.p.flatAxis), steep: meridian(c.p.steepAxis), horizontal: meridian(0), vertical: meridian(90) },
     assumptions: modelAssumptions,
+    anterior,
   };
 }

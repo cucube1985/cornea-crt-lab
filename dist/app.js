@@ -1,28 +1,15 @@
-import {defaultParams,modelAssumptions,normalizeParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js';
-import {createViewer} from './renderer.js';
+import {defaultParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js?v=2';
+import {createViewer} from './renderer.js?v=2';
 import {calculatorLinks,resultFields,parseCalculatorText} from './recommend.js';
+import {createPatientWorkspace} from './patient-ui.js?v=2';
 
 const $=id=>document.getElementById(id);
 const BASE={...defaultParams,flatK:42.5,steepK:44,clearance:.020};
-const STORAGE='cornea-lab-v1';
 const numberKeys=['flatK','steepK','steepAxis','q','bc','rzd','lza','offsetX','offsetY','tiltX','tiltY','clearance'];
-let params={...BASE},fit,mode='fit',meridian='flat',viewer,updateTimer,toastTimer;
-const options={mode,scale:1,exploded:false,wireframe:false,showClearance:false,showAxes:true};
-const sourceLinks=['https://paragonvision.com/resources/fitting-guides-package-inserts/','https://www.accessdata.fda.gov/cdrh_docs/pdf5/P050031C.pdf','https://www.accessdata.fda.gov/cdrh_docs/pdf/P870024S043c.pdf'];
+let params={...BASE},fit,mode='fit',meridian='flat',viewer,updateTimer,toastTimer,patientWorkspace;
+const options={mode,scale:1,exploded:false,wireframe:false,showClearance:false,showAxes:true,showPupil:true};
 
-try {
-  const stored=JSON.parse(localStorage.getItem(STORAGE)||'null');
-  if(stored && typeof stored==='object'){
-    for(const key of numberKeys){
-      const input=$(key),v=stored[key];
-      const uiValue=key==='clearance'?v*1000:v;
-      if(typeof v==='number' && Number.isFinite(v) && uiValue>=Number(input.min) && uiValue<=Number(input.max)) params[key]=v;
-    }
-    if([10.5,11].includes(stored.diameter))params.diameter=stored.diameter;
-    if(typeof stored.autoSeat==='boolean')params.autoSeat=stored.autoSeat;
-    if(params.flatK>params.steepK)params={...BASE};
-  }
-}catch{}
+// Patient inputs stay in memory unless the comparison panel's device-storage option is enabled.
 
 function format(n,digits=0){return Number.isFinite(n)?n.toFixed(digits):'—';}
 function toast(message){$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,3500);}
@@ -42,16 +29,18 @@ function validate(){
 }
 function schedule(){clearTimeout(updateTimer);updateTimer=setTimeout(recalculate,35);}
 function recalculate(){
-  if(!validate())return;
+  if(!validate())return false;
   try{
     fit=sampleFit(params);
     viewer?.update(params,fit,options);
     updateReadout();drawProfile();drawMap();
-    try{localStorage.setItem(STORAGE,JSON.stringify(params));}catch{}
-  }catch(error){toast('모델을 계산할 수 없습니다. 입력 범위를 확인해 주세요.');console.error(error);}
+    patientWorkspace?.update(params,fit);
+    return true;
+  }catch(error){toast('모델을 계산할 수 없습니다. 입력 범위를 확인해 주세요.');console.error(error);return false;}
 }
 function updateReadout(){
   const p=fit.params,m=fit.metrics;
+  updateSceneLegend();
   $('flat-radius').textContent=format(fit.radii.flat,2);$('steep-radius').textContent=format(fit.radii.steep,2);
   $('flat-axis').textContent=format(p.flatAxis)+'°';$('astig-value').textContent=format(p.steepK-p.flatK,2);
   $('axis-summary').textContent=`Flat ${format(p.flatAxis)}° / Steep ${format(p.steepAxis)}°`;
@@ -63,8 +52,16 @@ function updateReadout(){
   else{insights.push({tone:'',title:'수동 높이로 배치한 상태',body:`샘플 최소 간격 ${format(m.minGap,1)} µm. 꼭짓점 높이를 바꾸면 지도와 단면이 함께 변합니다.`});}
   if(Math.hypot(params.offsetX,params.offsetY)>.05 || Math.abs(params.tiltX)+Math.abs(params.tiltY)>.1){insights.push({tone:'amber',title:'원주 방향 간격의 차이',body:`반경 ${format(m.asymmetryRadius,1)} mm 원에서 최대−최소 ${format(m.asymmetry)} µm. 이동·기울기는 사용자가 설정한 정적 조건입니다.`});}
   else{insights.push({tone:'',title:'두 주경선의 높이 차이',body:`반경 4 mm에서 각막 높이 차이 ${format(Math.abs(m.elevationDifference))} µm. 회전대칭 렌즈와 난시 각막 사이의 간격을 비교해 보세요.`});}
-  if(m.coverageFraction<.999){insights.push({tone:'rose',title:'계산 영역을 벗어난 부분이 있습니다',body:`렌즈 격자의 ${format((1-m.coverageFraction)*100,1)}%에서 각막 수학 표면이 정의되지 않습니다. 지도 빈 영역과 해당 부분은 분석에서 제외됩니다.`});}
+  if(m.coverageFraction<.999){insights.push({tone:'rose',title:'각막 경계 밖 또는 계산 불가 영역',body:`렌즈 격자의 ${format((1-m.coverageFraction)*100,1)}%가 각막 경계 또는 수학 영역 밖입니다. 지도 빈 영역과 해당 부분은 분석에서 제외됩니다.`});}
+  const a=fit.anterior;
+  $('pupil-distance').textContent=format(a.pupilToLens,2);
+  $('pupil-overlap').textContent=a.pupilOverlap===null?'—':format(a.pupilOverlap*100,1);
+  $('pupil-overlap-note').textContent=params.treatmentDiameter===null?'치료 영역 미입력 · BC 직경을 대신 쓰지 않습니다.':'별도 입력한 치료 영역과의 평면 겹침 · 시력 예측 아님';
   $('insights').replaceChildren(...insights.map(item=>{const div=document.createElement('div');div.className='insight '+item.tone;const strong=document.createElement('strong');strong.textContent=item.title;const paragraph=document.createElement('p');paragraph.textContent=item.body;div.append(strong,paragraph);return div;}));
+}
+function updateSceneLegend(){
+  $('pupil-legend').hidden=!options.showPupil||mode==='lens';
+  $('treatment-legend').hidden=!options.showPupil||mode==='lens'||params.treatmentDiameter===null;
 }
 
 // A single distance palette is used in the 2D map and the 3D surface overlay.
@@ -96,6 +93,11 @@ function drawMap(){
   // The cross marks the corneal apex relative to the lens-local footprint.
   const ax=cx-params.offsetX/(params.diameter/2)*radius,ay=cy+params.offsetY/(params.diameter/2)*radius;
   ctx.strokeStyle='#365561';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ax-3,ay);ctx.lineTo(ax+3,ay);ctx.moveTo(ax,ay-3);ctx.lineTo(ax,ay+3);ctx.stroke();
+  if(options.showPupil){
+    const projected=(x,y,r,color,dash=false)=>{ctx.beginPath();ctx.arc(cx+(x-params.offsetX)/(params.diameter/2)*radius,cy-(y-params.offsetY)/(params.diameter/2)*radius,r/(params.diameter/2)*radius,0,Math.PI*2);ctx.strokeStyle=color;ctx.lineWidth=1.2;ctx.setLineDash(dash?[3,2]:[]);ctx.stroke();ctx.setLineDash([]);};
+    projected(params.pupilX,params.pupilY,fit.anterior.pupilDiameter/2,'#9260af');
+    if(params.treatmentDiameter!==null)projected(params.treatmentX,params.treatmentY,params.treatmentDiameter/2,'#b98540',true);
+  }
 }
 function drawProfile(){
   if(!fit)return;
@@ -130,6 +132,7 @@ function setMode(next){
   $('scene-kicker').textContent=text[0];$('scene-title').textContent=text[1];$('scene-description').textContent=text[2];
   document.querySelectorAll('.scene-legend>span')[0].style.opacity=mode==='lens'?'.35':'1';document.querySelectorAll('.scene-legend>span')[1].style.opacity=mode==='cornea'?'.35':'1';
   viewer?.update(params,fit,options);drawProfile();
+  updateSceneLegend();
 }
 const error=document.createElement('p');error.id='input-error';error.hidden=true;error.className='input-error';error.setAttribute('role','alert');error.textContent='Steep K를 Flat K 이상으로 입력해 주세요. 모델은 마지막 유효한 값으로 표시됩니다.';$('cornea-section').querySelector('.radii-note').after(error);
 
@@ -140,6 +143,7 @@ numberKeys.forEach(key=>{
     const value=Number(input.value);
     if(!Number.isFinite(value)||value<Number(input.min)||value>Number(input.max))return;
     params[key]=key==='clearance'?value/1000:value;
+    if(key==='q'){params.qFlat=null;params.qSteep=null;patientWorkspace?.markCommonQ();}
     if(['steepAxis','bc'].includes(key)){$(key+'-range').value=value;paintRange($(key+'-range'));}
     clearPreset();schedule();
   });
@@ -164,21 +168,21 @@ document.querySelectorAll('[data-diameter]').forEach(button=>button.addEventList
 document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>setMode(button.dataset.mode)));
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{viewer?.setView(button.dataset.view);document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b===button));}));
 document.querySelectorAll('[data-meridian]').forEach(button=>button.addEventListener('click',()=>{meridian=button.dataset.meridian;document.querySelectorAll('[data-meridian]').forEach(b=>b.classList.toggle('active',b===button));updateReadout();drawProfile();}));
-for(const key of ['exploded','wireframe','showClearance'])$(key).addEventListener('change',()=>{options[key]=$(key).checked;$('exploded-note').hidden=!options.exploded;viewer?.update(params,fit,options);});
+for(const key of ['exploded','wireframe','showClearance','showPupil'])$(key).addEventListener('change',()=>{options[key]=$(key).checked;$('exploded-note').hidden=!options.exploded;viewer?.update(params,fit,options);drawMap();updateSceneLegend();});
 $('scale').addEventListener('change',()=>{options.scale=Number($('scale').value);$('scene-scale').textContent=options.scale===1?'실제 비율 ×1':`깊이 강조 ×${options.scale} · 수직축만 확대`;viewer?.update(params,fit,options);});
 document.querySelectorAll('[data-preset]').forEach(button=>button.addEventListener('click',()=>{
   const preset=button.dataset.preset;
-  const patches={baseline:{},astig:{flatK:42,steepK:45},decenter:{offsetX:.6,offsetY:.3},tilt:{tiltX:1.5,tiltY:-.75},interference:{autoSeat:false,clearance:-.02}};
-  params={...BASE,...patches[preset]};syncInputs();setMode('fit');recalculate();
+  const centered={offsetX:0,offsetY:0,tiltX:0,tiltY:0,autoSeat:true};
+  const patches={baseline:centered,astig:{...centered,flatK:42,steepK:45},decenter:{...centered,offsetX:.6,offsetY:.3},tilt:{...centered,tiltX:1.5,tiltY:-.75},interference:{...centered,autoSeat:false,clearance:-.02}};
+  params={...params,...patches[preset]};syncInputs();setMode('fit');recalculate();
   document.querySelectorAll('[data-preset]').forEach(b=>b.classList.toggle('selected',b===button));
   if(preset==='interference'){options.showClearance=true;$('showClearance').checked=true;viewer?.update(params,fit,options);}
 }));
-$('reset-btn').addEventListener('click',()=>{params={...BASE};Object.assign(options,{mode:'fit',scale:1,exploded:false,wireframe:false,showClearance:false});for(const key of ['exploded','wireframe','showClearance'])$(key).checked=false;$('scale').value='1';$('exploded-note').hidden=true;$('scene-scale').textContent='실제 비율 ×1';meridian='flat';document.querySelectorAll('[data-meridian]').forEach(b=>b.classList.toggle('active',b.dataset.meridian==='flat'));syncInputs();setMode('fit');recalculate();viewer?.setView('perspective');document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='perspective'));document.querySelectorAll('[data-preset]').forEach(b=>b.classList.toggle('selected',b.dataset.preset==='baseline'));toast('기본 파라미터로 초기화했습니다.');});
+$('reset-btn').addEventListener('click',()=>{params={...BASE};Object.assign(options,{mode:'fit',scale:1,exploded:false,wireframe:false,showClearance:false,showPupil:true});$('showPupil').checked=true;for(const key of ['exploded','wireframe','showClearance'])$(key).checked=false;$('scale').value='1';$('exploded-note').hidden=true;$('scene-scale').textContent='실제 비율 ×1';meridian='flat';document.querySelectorAll('[data-meridian]').forEach(b=>b.classList.toggle('active',b.dataset.meridian==='flat'));syncInputs();setMode('fit');recalculate();viewer?.setView('perspective');document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='perspective'));document.querySelectorAll('[data-preset]').forEach(b=>b.classList.toggle('selected',b.dataset.preset==='baseline'));toast('기본 파라미터로 초기화했습니다.');});
 $('export-btn').addEventListener('click',()=>{
   if(!validate())return;
   clearTimeout(updateTimer);recalculate();
-  const record={application:'CORNEA LAB',version:'1.0',createdAt:new Date().toISOString(),purpose:'Educational static geometry only; not a clinical fitting or treatment prediction',input:params,effectivePosition:{clearanceMm:fit.clearance,autoSeated:fit.autoSeated},metrics:fit.metrics,metricUnits:{gapAndElevation:'micrometres',locationAndRadius:'millimetres',fractions:'0 to 1'},assumptions:modelAssumptions,sources:sourceLinks};
-  const url=URL.createObjectURL(new Blob([JSON.stringify(record,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='cornea-lab-settings.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('설정과 계산값을 JSON 파일로 저장했습니다.');
+  patientWorkspace?.exportSession();
 });
 // Recommended starting lens: results come from an external calculator and are applied on request.
 let recDiameter=10.5,recApply=null;
@@ -245,6 +249,7 @@ for(const id of ['close-recommend','recommend-cancel'])$(id).addEventListener('c
 $('recommend-form').addEventListener('submit',event=>{
   event.preventDefault();updateRecommendation();if(!recApply)return;
   params={...params,...recApply,offsetX:0,offsetY:0,tiltX:0,tiltY:0,autoSeat:true};
+  if(recApply.q!==undefined){params.qFlat=null;params.qSteep=null;patientWorkspace?.markCommonQ();}
   clearPreset();syncInputs();setMode('fit');recalculate();$('recommend-dialog').close();
   toast(`추천값을 적용했습니다 · BC ${params.bc.toFixed(1)} / RZD ${params.rzd} / LZA ${params.lza}° / ${params.diameter.toFixed(1)} mm`);
 });
@@ -256,4 +261,6 @@ const resizeObserver=new ResizeObserver(()=>{drawProfile();drawMap();});resizeOb
 syncInputs();
 try{viewer=createViewer($('viewer'),{corneaZ,lensZ,lensSag});}catch(error){console.error(error);$('viewer').textContent='이 브라우저에서 3D를 시작하지 못했습니다. 단면과 간격 지도를 확인해 주세요.';}
 recalculate();
-window.addEventListener('pagehide',()=>{viewer?.dispose();resizeObserver.disconnect();});
+patientWorkspace=createPatientWorkspace({getParams:()=>params,getFit:()=>fit,toast,applyParams:next=>{const previous=params;params={...next};syncInputs();if(!recalculate()){params=previous;syncInputs();recalculate();return false;}clearPreset();return true;}});
+$('reset-btn').addEventListener('click',()=>patientWorkspace.resetMetadata());
+window.addEventListener('pagehide',()=>{viewer?.dispose();resizeObserver.disconnect();patientWorkspace?.dispose();});

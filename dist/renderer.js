@@ -1,8 +1,8 @@
 import * as THREE from './vendor/three.module.js';
+import {createGeometrySampler} from './geometry.js?v=2';
 
 // All model coordinates are millimetres. The model's anterior axis (z) is
 // Three's vertical axis (y); the camera is the only thing that is rotated.
-const CORNEA_RADIUS = 5.9;
 const ANGULAR_STEPS = 176;
 const RADIAL_STEPS = 58;
 const TAU = Math.PI * 2;
@@ -48,9 +48,11 @@ function makeDisc(radius, sample, colorSample) {
   const positions = [];
   const colors = [];
   const indices = [];
+  const valid=[];
   const append = (x, y) => {
     const point = sample(x, y);
-    positions.push(point[0], point[1], point[2]);
+    valid.push(point.every(Number.isFinite));
+    positions.push(...(valid.at(-1)?point:[0,0,0]));
     if (colorSample) {
       const color = colorSample(x, y);
       colors.push(color.r, color.g, color.b);
@@ -75,7 +77,7 @@ function makeDisc(radius, sample, colorSample) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   if (colorSample) geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setIndex(indices);
+  geometry.setIndex(indices.filter((_,i)=>valid[indices[i-i%3]]&&valid[indices[i-i%3+1]]&&valid[indices[i-i%3+2]]));
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   return geometry;
@@ -84,11 +86,13 @@ function makeDisc(radius, sample, colorSample) {
 function makeRim(radius, sample, thickness) {
   const positions = [];
   const indices = [];
+  const valid=[];
   for (let i = 0; i <= ANGULAR_STEPS; i += 1) {
     const angle = i / ANGULAR_STEPS * TAU;
     const point = sample(radius * Math.cos(angle), radius * Math.sin(angle));
-    positions.push(point[0], point[1], point[2]);
-    positions.push(point[0], point[1] + thickness, point[2]);
+    valid.push(point.every(Number.isFinite));
+    const v=valid.at(-1)?point:[0,0,0];
+    positions.push(...v,v[0],v[1]+thickness,v[2]);
     if (i < ANGULAR_STEPS) {
       const a = i * 2;
       indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
@@ -96,29 +100,30 @@ function makeRim(radius, sample, thickness) {
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
+  geometry.setIndex(indices.filter((_,i)=>{const j=i-i%3;return valid[Math.floor(indices[j]/2)]&&valid[Math.floor(indices[j+1]/2)]&&valid[Math.floor(indices[j+2]/2)];}));
   geometry.computeVertexNormals();
   return geometry;
 }
 
 function makeRing(radius, sample, color, opacity = 1, dash = false) {
   const points = [];
-  for (let i = 0; i <= 256; i += 1) {
-    const angle = i / 256 * TAU;
-    points.push(new THREE.Vector3(...sample(radius * Math.cos(angle), radius * Math.sin(angle))));
+  for (let i = 0; i < 256; i += 1) {
+    const a=i/256*TAU,b=(i+1)/256*TAU;
+    const p=sample(radius*Math.cos(a),radius*Math.sin(a)),q=sample(radius*Math.cos(b),radius*Math.sin(b));
+    if(p.every(Number.isFinite)&&q.every(Number.isFinite))points.push(new THREE.Vector3(...p),new THREE.Vector3(...q));
   }
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
   const Material = dash ? THREE.LineDashedMaterial : THREE.LineBasicMaterial;
   const material = new Material({ color, transparent: true, opacity, depthWrite: false,
     ...(dash ? { dashSize: 0.13, gapSize: 0.10 } : {}) });
-  const line = new THREE.Line(geometry, material);
+  const line = new THREE.LineSegments(geometry, material);
   if (dash) line.computeLineDistances();
   return line;
 }
 
 function makeGrid(radius, sample, { color, opacity, radialStep = 0.5, spokes = 16 }) {
   const positions = [];
-  const segment = (a, b) => positions.push(...sample(...a), ...sample(...b));
+  const segment = (a, b) => {const p=sample(...a),q=sample(...b);if(p.every(Number.isFinite)&&q.every(Number.isFinite))positions.push(...p,...q);};
   for (let r = radialStep; r < radius - 0.08; r += radialStep) {
     for (let i = 0; i < 160; i += 1) {
       const a = i / 160 * TAU;
@@ -146,11 +151,12 @@ function makeAxes(radius, sample, p) {
   const axisAngle = finite(p.steepAxis, 90) * DEG;
   [axisAngle, axisAngle + Math.PI / 2].forEach((angle, index) => {
     const points = [];
-    for (let j = 0; j <= 96; j += 1) {
-      const r = (j / 96 * 2 - 1) * radius;
-      points.push(new THREE.Vector3(...sample(r * Math.cos(angle), r * Math.sin(angle))));
+    for (let j = 0; j < 96; j += 1) {
+      const r=(j/96*2-1)*radius,s=((j+1)/96*2-1)*radius;
+      const a=sample(r*Math.cos(angle),r*Math.sin(angle)),b=sample(s*Math.cos(angle),s*Math.sin(angle));
+      if(a.every(Number.isFinite)&&b.every(Number.isFinite))points.push(new THREE.Vector3(...a),new THREE.Vector3(...b));
     }
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),
+    const line = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points),
       new THREE.LineDashedMaterial({ color: index === 0 ? '#417fba' : '#55ad99',
         opacity: 0.72, transparent: true, dashSize: 0.15, gapSize: 0.10, depthWrite: false }));
     line.computeLineDistances();
@@ -300,49 +306,59 @@ export function createViewer(container, { corneaZ, lensZ, lensSag }) {
     params = fit?.params || nextParams;
     if (!params) return;
     const p = params;
+    const compiled=createGeometrySampler(p);
+    const corneaRadius=p.hvid/2,ellipseRatio=p.vvid/p.hvid;
     const scale = Math.max(0.2, finite(state.scale, 1));
     const radius = finite(p.diameter, 10.5) / 2;
     const cx = finite(p.offsetX);
     const cy = finite(p.offsetY);
     const exploded = state.exploded && state.mode === 'fit' ? 1.9 : 0;
     const heatmap = Boolean(state.clearanceMap || state.showClearance || state.heatmap);
-    const corneaPoint = (x, y, lift = 0) => [x, finite(corneaZ(x, y, p)) * scale + lift, -y];
+    const corneaPoint = (x, y, lift = 0) => [x, compiled.corneaZ(x,y)*scale+lift,-y];
+    const ellipsePoint=(x,y,lift=0)=>corneaPoint(x,y*ellipseRatio,lift);
     const lensPoint = (x, y, lift = 0) => {
       const worldX = x + cx;
       const worldY = y + cy;
-      return [worldX, finite(lensZ(worldX, worldY, p), finite(p.clearance) - finite(lensSag(Math.hypot(x, y), p))) * scale + exploded + lift, -worldY];
+      return [worldX,compiled.lensZ(worldX,worldY)*scale+exploded+lift,-worldY];
     };
     disposeTree(model);
 
     minY = 0;
     for (let i = 0; i < 64; i += 1) {
       const angle = i / 64 * TAU;
-      minY = Math.min(minY, corneaPoint(CORNEA_RADIUS * Math.cos(angle), CORNEA_RADIUS * Math.sin(angle))[1]);
+      const y=ellipsePoint(corneaRadius*Math.cos(angle),corneaRadius*Math.sin(angle))[1];
+      if(Number.isFinite(y))minY=Math.min(minY,y);
     }
     if (state.mode !== 'lens') {
-      const cornea = new THREE.Mesh(makeDisc(CORNEA_RADIUS, (x, y) => corneaPoint(x, y)),
+      const cornea = new THREE.Mesh(makeDisc(corneaRadius, (x, y) => ellipsePoint(x, y)),
         new THREE.MeshPhysicalMaterial({ color: '#77d5c7', roughness: 0.22, metalness: 0.02,
           transparent: true, opacity: state.mode === 'cornea' ? 0.72 : 0.49,
           side: THREE.DoubleSide, depthWrite: false, clearcoat: 0.8, clearcoatRoughness: 0.22 }));
       cornea.renderOrder = 1;
       model.add(cornea);
-      const corneaEdge = new THREE.Mesh(makeRim(CORNEA_RADIUS, (x, y) => corneaPoint(x, y), -0.10 * scale),
+      const corneaEdge = new THREE.Mesh(makeRim(corneaRadius, (x, y) => ellipsePoint(x, y), -0.10 * scale),
         new THREE.MeshStandardMaterial({ color: '#47a99e', transparent: true, opacity: 0.19,
           side: THREE.DoubleSide, depthWrite: false, roughness: 0.3 }));
       corneaEdge.renderOrder = 1;
       model.add(corneaEdge);
-      const grid = makeGrid(CORNEA_RADIUS, (x, y) => corneaPoint(x, y, 0.010), {
+      const grid = makeGrid(corneaRadius, (x, y) => ellipsePoint(x, y, 0.010), {
         color: '#388e89', opacity: state.wireframe ? 0.40 : 0.15, radialStep: state.wireframe ? 0.35 : 0.65, spokes: state.wireframe ? 24 : 16,
       });
       grid.renderOrder = 2;
       model.add(grid);
-      const limbus = makeRing(CORNEA_RADIUS, (x, y) => corneaPoint(x, y, 0.012), '#46988f', 0.53);
+      const limbus = makeRing(corneaRadius, (x, y) => ellipsePoint(x, y, 0.012), '#46988f', 0.53);
       limbus.renderOrder = 3;
       model.add(limbus);
       if (state.showAxes) {
-        const axes = makeAxes(CORNEA_RADIUS, (x, y) => corneaPoint(x, y, 0.035), p);
+        const axes = makeAxes(Math.max(corneaRadius,p.vvid/2), (x, y) => corneaPoint(x, y, 0.035), p);
         axes.renderOrder = 5;
         model.add(axes);
+      }
+      if(state.showPupil!==false){
+        const pupilRadius=(p.pupilLight==='day'?p.pupilDay:p.pupilNight)/2;
+        const pupil=makeRing(pupilRadius,(x,y)=>corneaPoint(x+p.pupilX,y+p.pupilY,.065),'#9a6bb9',.95);pupil.renderOrder=12;model.add(pupil);
+        const center=makeRing(.055,(x,y)=>corneaPoint(x+p.pupilX,y+p.pupilY,.07),'#855ca0',1);center.renderOrder=12;model.add(center);
+        if(p.treatmentDiameter!==null){const zone=makeRing(p.treatmentDiameter/2,(x,y)=>corneaPoint(x+p.treatmentX,y+p.treatmentY,.055),'#d29c56',.95,true);zone.renderOrder=11;model.add(zone);}
       }
     }
 
@@ -351,7 +367,7 @@ export function createViewer(container, { corneaZ, lensZ, lensSag }) {
       const colorSample = heatmap ? (x, y) => {
         const worldX = x + cx;
         const worldY = y + cy;
-        return gapColor(lensZ(worldX, worldY, p) - corneaZ(worldX, worldY, p));
+        return gapColor(compiled.lensZ(worldX,worldY)-compiled.corneaZ(worldX,worldY));
       } : null;
       const posterior = new THREE.Mesh(makeDisc(radius, (x, y) => lensPoint(x, y), colorSample),
         new THREE.MeshPhysicalMaterial({ color: heatmap ? '#ffffff' : '#90cbea', vertexColors: heatmap,
@@ -393,7 +409,7 @@ export function createViewer(container, { corneaZ, lensZ, lensSag }) {
           const y = radius * Math.sin(angle);
           const from = corneaPoint(x + cx, y + cy, 0.02);
           const to = lensPoint(x, y);
-          guidePoints.push(...from, ...to);
+          if(from.every(Number.isFinite)&&to.every(Number.isFinite))guidePoints.push(...from, ...to);
         }
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(guidePoints, 3));
