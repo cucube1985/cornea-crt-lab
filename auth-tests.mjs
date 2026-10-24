@@ -4,7 +4,8 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {openAuthStore} from './auth/store.mjs';
-import {createAuthenticatedServer,validateOrigin,originFromEnvironment} from './auth/http.mjs';
+import {createAuthenticatedServer,validateOrigin} from './auth/http.mjs';
+import {localServerConfig} from './auth/local-config.mjs';
 
 const temp=await mkdtemp(path.join(tmpdir(),'cornea-auth-test-')),filename=path.join(temp,'auth.sqlite');
 const seed='Test-only-admin-password-42',memberPassword='Test-only-member-password-42',changed='Test-only-new-password-84';
@@ -13,13 +14,14 @@ const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const close=server=>server?new Promise(resolve=>server.close(resolve)):Promise.resolve();
 try{
   assert.throws(()=>validateOrigin('http://example.com'));assert.throws(()=>validateOrigin('https://example.com/path'));
-  assert.equal(originFromEnvironment({NODE_ENV:'production',RENDER_EXTERNAL_URL:'https://cornea-test.onrender.com/'},10000),'https://cornea-test.onrender.com');
-  assert.equal(originFromEnvironment({NODE_ENV:'production',PUBLIC_ORIGIN:'https://custom.example',RENDER_EXTERNAL_URL:'https://cornea-test.onrender.com'},10000),'https://custom.example');
-  assert.throws(()=>originFromEnvironment({NODE_ENV:'production'},10000));
-  assert.throws(()=>originFromEnvironment({NODE_ENV:'production',RENDER_EXTERNAL_URL:'http://cornea-test.onrender.com'},10000));
+  const savedHost=process.env.HOST,savedOrigin=process.env.PUBLIC_ORIGIN;
+  try{process.env.HOST='0.0.0.0';process.env.PUBLIC_ORIGIN='https://external.example';assert.deepEqual(localServerConfig(),{host:'127.0.0.1',port:4173,origin:'http://127.0.0.1:4173',trustProxy:false});}
+  finally{if(savedHost===undefined)delete process.env.HOST;else process.env.HOST=savedHost;if(savedOrigin===undefined)delete process.env.PUBLIC_ORIGIN;else process.env.PUBLIC_ORIGIN=savedOrigin;}
   await assert.rejects(()=>openAuthStore({filename:path.join(temp,'missing.sqlite')}),/관리자 계정/);
   store=await openAuthStore({filename,initialPassword:seed,now:()=>clock});
-  server=await createAuthenticatedServer({store,root:fileURLToPath(new URL('./dist/',import.meta.url)),origin});await listen(server);
+  let shutdownCalls=0;
+  const localControl={ready:true,instanceId:'test-instance',token:'test-only-local-stop-token',shutdown:()=>shutdownCalls++};
+  server=await createAuthenticatedServer({store,root:fileURLToPath(new URL('./dist/',import.meta.url)),origin,localControl});await listen(server);
   const base=`http://127.0.0.1:${server.address().port}`;
   const call=async(route,{method='GET',body,cookie='',csrf='',requestOrigin=origin,extra={}}={})=>{
     const response=await fetch(base+route,{method,headers:{...(method==='GET'?{}:{Origin:requestOrigin,'Content-Type':'application/json','X-Cornea-Request':'1','X-CSRF-Token':csrf}),...(cookie?{Cookie:cookie}:{}),...extra},body:body===undefined?undefined:JSON.stringify(body)});
@@ -27,6 +29,13 @@ try{
     return {response,status:response.status,text,data,cookie:response.headers.get('set-cookie')?.split(';')[0]};
   };
   const login=(username,password)=>call('/api/login',{method:'POST',body:{username,password}});
+  assert.equal(server.address().address,'127.0.0.1');
+  assert.equal((await call('/healthz')).data.scope,'loopback');
+  assert.equal((await call('/__local/shutdown',{method:'POST',body:{}})).status,403);
+  assert.equal((await call('/__local/shutdown',{method:'POST',extra:{'X-Cornea-Stop':localControl.token},body:{}})).status,403);
+  assert.equal(shutdownCalls,0);
+  const stopped=await fetch(base+'/__local/shutdown',{method:'POST',headers:{'X-Cornea-Stop':localControl.token}});assert.equal(stopped.status,200);await stopped.text();
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(shutdownCalls,1);
   assert.match((await call('/')).text,/로그인 · CORNEA LAB/);
   assert.equal((await call('/app.js')).status,401);assert.equal((await call('/geometry.js')).status,401);
   assert.equal((await call('/api/users',{cookie:'cornea-session=admin'})).status,401);

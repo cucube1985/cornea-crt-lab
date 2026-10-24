@@ -27,8 +27,6 @@ jobs:
           node-version: 24
       - run: npm test
       - run: node scripts/build-pages.mjs
-        env:
-          CORNEA_SERVER_ORIGIN: ${{ vars.CORNEA_SERVER_ORIGIN }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

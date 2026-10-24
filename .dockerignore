@@ -1,9 +1,0 @@
-.git
-.private
-.env
-.env.*
-node_modules
-*.sqlite*
-pages
-docs
-*-tests.mjs

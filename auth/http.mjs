@@ -12,18 +12,13 @@ export function validateOrigin(value){
   if(url.protocol!=='https:'&&!(url.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(url.hostname)))throw new Error('PUBLIC_ORIGIN must use HTTPS except on loopback.');
   return url;
 }
-export function originFromEnvironment(env,port){
-  const origin=env.PUBLIC_ORIGIN||env.RENDER_EXTERNAL_URL?.replace(/\/$/,'')||(env.NODE_ENV==='production'?null:`http://127.0.0.1:${port}`);
-  if(!origin)throw new Error('Production requires PUBLIC_ORIGIN or Render\'s RENDER_EXTERNAL_URL.');
-  validateOrigin(origin);return origin;
-}
 async function jsonBody(req){
   if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')throw new AccessError(415,'JSON 요청만 지원합니다.');
   let bytes=0;const chunks=[];
   for await(const chunk of req){bytes+=chunk.length;if(bytes>4096)throw new AccessError(413,'요청이 너무 큽니다.');chunks.push(chunk);}
   try{const value=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!value||typeof value!=='object'||Array.isArray(value))throw new Error();return value;}catch{throw new AccessError(400,'요청 형식을 확인해 주세요.');}
 }
-export async function createAuthenticatedServer({store,root,origin,trustProxy=false}){
+export async function createAuthenticatedServer({store,root,origin,trustProxy=false,localControl}){
   const publicOrigin=validateOrigin(origin),secure=publicOrigin.protocol==='https:',cookieName=secure?'__Host-cornea-session':'cornea-session';
   const rootPath=await realpath(root);
   const cookie=(value,maxAge)=>`${cookieName}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`;
@@ -40,7 +35,11 @@ export async function createAuthenticatedServer({store,root,origin,trustProxy=fa
       const value=readCookie(req),actor=store.session(value,{touch:pathname.startsWith('/api/')&&!observing});
       const exposed=actor?{username:actor.username,role:actor.role,enabled:true}:null;
       const ip=trustProxy?(req.headers['x-forwarded-for']?.split(',').at(-1)?.trim()||req.socket.remoteAddress):req.socket.remoteAddress;
-      if(pathname==='/healthz'&&req.method==='GET'){json(res,200,{ok:true});return;}
+      if(pathname==='/healthz'&&req.method==='GET'){json(res,localControl&&!localControl.ready?503:200,{ok:!localControl||localControl.ready,service:'cornea-crt-lab',...(localControl?{scope:'loopback',instanceId:localControl.instanceId}:{})});return;}
+      if(pathname==='/__local/shutdown'&&localControl){
+        if(req.method!=='POST'||req.headers.origin||req.headers['sec-fetch-site']||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress)||!sameSecret(req.headers['x-cornea-stop'],localControl.token))throw new AccessError(403,'로컬 종료 요청을 확인할 수 없습니다.');
+        json(res,200,{ok:true});setImmediate(localControl.shutdown);return;
+      }
       if(pathname.startsWith('/api/')){
         if(!['GET','POST','PATCH'].includes(req.method))throw new AccessError(405,'지원하지 않는 요청입니다.');
         if(req.method!=='GET'){

@@ -17,7 +17,7 @@ export function serverAccess(){
     csrf=result.csrf;return result.user;
   }
   return {
-    notice:'계정은 서버에 저장되며 여러 기기에서 사용할 수 있습니다.',
+    notice:'이 노트북에서만 사용하는 로컬 계정입니다.',
     session:async({observe=false}={})=>accept(await request('session'+(observe?'?observe=1':''))),
     login:async(username,password)=>accept(await request('login',{method:'POST',body:{username,password}})),
     async logout(){await request('logout',{method:'POST',body:{}});csrf='';},

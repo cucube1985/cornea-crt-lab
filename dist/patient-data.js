@@ -1,4 +1,4 @@
-import {defaultParams,normalizeParams} from './geometry.js?v=4';
+import {defaultParams,normalizeParams} from './geometry.js?v=5';
 
 export const parameterLimits={flatK:[35,55],steepK:[35,55],steepAxis:[0,180],q:[-1.5,.5],bc:[7.5,10.5],rzd:[400,700],lza:[25,45],diameter:[10.5,11],offsetX:[-1,1],offsetY:[-1,1],tiltX:[-5,5],tiltY:[-5,5],clearance:[-.1,.5],seatTarget:[0,10],hvid:[8,15],vvid:[8,15],qFlat:[-1.5,.5],qSteep:[-1.5,.5],sag8Flat:[100,5000],sag8Steep:[100,5000],sag10Flat:[100,6000],sag10Steep:[100,6000],asymNT:[-200,200],asymSI:[-200,200],pupilDay:[1,10],pupilNight:[1,10],pupilX:[-2,2],pupilY:[-2,2],treatmentDiameter:[1,8],treatmentX:[-2,2],treatmentY:[-2,2]};
 export const optionalParameters=new Set(['qFlat','qSteep','sag8Flat','sag8Steep','sag10Flat','sag10Steep','treatmentDiameter']);

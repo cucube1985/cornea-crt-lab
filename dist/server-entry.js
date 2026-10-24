@@ -1,5 +1,5 @@
-import {serverAccess} from './access-provider.js?v=4';
-import {mountAccountSettings} from './access-ui.js?v=4';
+import {serverAccess} from './access-provider.js?v=5';
+import {mountAccountSettings} from './access-ui.js?v=5';
 
 const provider=serverAccess(),root=document.getElementById('lab-app');
 let redirecting=false;
@@ -12,7 +12,7 @@ try{
     document.documentElement.dataset.account=user.username;
     root.hidden=false;document.getElementById('server-boot').hidden=true;
     mountAccountSettings(provider,user);
-    await import('./app.js?v=4');
+    await import('./app.js?v=5');
     let lastActivity=Date.now(),lastTouch=Date.now(),checking=false;
     for(const event of ['pointerdown','keydown','wheel'])window.addEventListener(event,()=>{lastActivity=Date.now();},{passive:true});
     const timer=setInterval(async()=>{

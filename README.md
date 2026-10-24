@@ -1,35 +1,45 @@
-# CORNEA LAB
+# CORNEA LAB · 이 노트북 전용
 
-한국어 각막 / CRT 렌즈 교육용 3D 기하 탐색기. 서버 로그인과 관리자 계정 관리를 갖춘 Node.js 24 + ES module 웹 앱입니다.
+각막 / CRT 렌즈 교육용 3D 기하 탐색기입니다. **이 노트북에서만** 로그인하고 사용하도록 구성했습니다. 유료 호스팅이나 외부 인증 서버는 필요하지 않습니다.
 
-**서버 로그인은 `codex/server-login`에서 준비 중이며 아직 공개 사이트에 적용되지 않았습니다.** 실제 HTTPS 서버와 영구 저장소를 연결·검증한 후 기존 GitHub Pages를 로그인 서버로 안내하는 입구로 전환합니다. [서버 설정·계정 관리 안내](docs/server-login.md)를 확인하세요.
+## 시작과 종료
 
-## 온라인
+1. 이 폴더의 **앱 시작.cmd**를 더블클릭합니다. 서버가 백그라운드에서 실행되고 기본 브라우저에 로그인 화면이 열립니다.
+2. 주소는 **http://127.0.0.1:4173/** 입니다. 초기 설정한 `admin` 계정으로 로그인합니다. 비밀번호는 공개 소스에 포함하지 않습니다.
+3. 상단 **설정**에서 계정 추가, 활성/비활성 상태, 내 비밀번호 변경을 사용할 수 있습니다.
+4. 마칠 때 **앱 종료.cmd**를 실행합니다. 브라우저 창을 닫는 것만으로는 서버가 종료되지 않습니다.
 
-https://cucube1985.github.io/cornea-crt-lab/
+노트북 종료·재부팅 시 서버도 종료됩니다. 다시 사용할 때 시작 파일을 실행합니다. 절전 중에는 이용할 수 없으며, 절전 복귀 후 세션이 만료됐다면 다시 로그인합니다. OS 자동 실행은 등록하지 않습니다. 시작 파일을 반복 실행해도 서버를 중복 실행하지 않습니다.
 
-## 소스 관리와 배포
+## 이 노트북에만 접속 허용
 
-이 프로젝트의 소스는 [GitHub 저장소](https://github.com/cucube1985/cornea-crt-lab)에서 관리합니다. 서버 로그인 버전의 실제 앱은 Node HTTPS 서버가 제공하며, GitHub Pages는 로그인 서버로 안내하는 입구입니다.
+서버 주소와 로그인 origin은 `127.0.0.1:4173`으로 고정됩니다. 환경 변수로 LAN/외부 접속을 켜지 않으며, 같은 와이파이의 다른 PC·휴대폰에서도 이 서버에 접속할 수 없습니다. 방화벽 포트 개방, 공유기 변경, 외부 터널은 만들지 않습니다.
 
-작업 순서는 **수정 및 로컬 확인 → 테스트 → 서버 배포·검증 → Pages 연결 → 공개 배포 확인**입니다. 인증 서버 준비 전에는 이 브랜치를 `main`에 합치지 않습니다. 서버가 준비되면 저장소 변수 `CORNEA_SERVER_ORIGIN`을 설정하고, [배포 워크플로](https://github.com/cucube1985/cornea-crt-lab/actions/workflows/pages.yml)는 `dist/` 대신 서버 안내 페이지만 게시합니다.
+계정과 비밀번호 해시, 세션은 `.private/accounts.sqlite`에 보관됩니다. 서버를 껐다 켜도 유지되며 GitHub에는 업로드하지 않습니다. 종료 파일은 비공개 제어 토큰과 실행 식별자를 확인해 해당 앱만 정상 종료합니다.
+
+## GitHub와 사이트
+
+- [GitHub 저장소](https://github.com/cucube1985/cornea-crt-lab): 소스와 변경 기록
+- [GitHub Pages](https://cucube1985.github.io/cornea-crt-lab/): 사용 안내와 로컬 앱 열기 링크
+
+Pages에는 모델 앱 파일이나 로그인 API, 계정 DB를 게시하지 않습니다. 실제 앱과 로그인은 이 노트북의 서버가 제공합니다. 공개 소스의 열람·복제를 막는 기능은 아닙니다.
+
+## 실행과 개발
 
 ```powershell
-# 이 README가 있는 저장소 디렉터리에서 실행
-git switch codex/server-login
-# 초기 관리자 설정 후 로컬 서버 실행
+# Node 24에서 이 저장소 폴더를 사용
+npm run local:start
+npm run local:stop
+# 직접 실행하고 Ctrl+C로 종료할 수도 있습니다
 npm start
-# 앱 수정 후 (Node 24)
 npm test
-# 서버 연결 전에는 작업 브랜치로만 푸시
-git push origin codex/server-login
 ```
 
-상위 작업 폴더와 이 앱의 Git 저장소가 다를 수 있으므로 이 README가 있는 디렉터리에서 작업합니다. 이전 배포의 `.openai/hosting.json`은 현재 배포에 사용되지 않습니다. 소스는 GitHub에 보관하고, 실제 서비스는 인증 서버에서 제공합니다.
+Node.js 24가 필요하며 이 노트북에는 설치되어 있습니다. 새로 복제한 환경에서는 초기 관리자 비밀번호를 stdin으로 전달해 `npm run init-admin -- --password-stdin`으로 초기화합니다. 기존 관리자 계정은 덮어쓰지 않습니다.
 
-## 실행
+기하·계산기·환자 비교·로그인·권한·세션·로컬 종료 인증 테스트를 통과한 뒤 GitHub에 소스를 올립니다. `main` 푸시 시 GitHub Actions는 테스트 후 `scripts/build-pages.mjs`로 만든 `pages/` 안내 화면만 게시합니다. OpenAI Sites와 유료 서버 배포 설정은 사용하지 않습니다. [로컬 로그인 안내](docs/server-login.md)를 확인하세요.
 
-Node.js 24에서 초기 관리자 비밀번호를 stdin으로 전달해 `npm run init-admin -- --password-stdin`을 실행한 뒤, `npm start` 후 http://127.0.0.1:4173 에 접속합니다. 초기 관리자 ID는 `admin`이며 실제 비밀번호는 소스에 포함하지 않습니다. 로그인 후 상단 **설정**에서 계정 추가, 활성/비활성 상태, 내 비밀번호 변경을 사용할 수 있습니다. 로그인하지 않은 요청의 앱 HTML/JS 접근도 서버에서 차단합니다. Three.js 0.170.0은 로컬 vendor에 포함하고 MIT 라이선스를 동봉했습니다. 폰트는 Google Fonts에서 로드하며 오프라인에서는 시스템 폰트로 표시합니다.
+빌드 과정 없이 Node 24와 정적 ES module/WebGL을 사용합니다. Three.js 0.170.0은 로컬 vendor에 포함하고 MIT 라이선스를 동봉했습니다. 폰트는 Google Fonts에서 로드하며 오프라인에서는 시스템 폰트로 표시합니다.
 
 ## 기능
 

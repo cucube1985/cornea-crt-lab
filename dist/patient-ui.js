@@ -1,5 +1,5 @@
-import {defaultParams,sampleFit} from './geometry.js?v=4';
-import {emptyMetadata,sourceNames,sanitizeRecord,elevationToSag,parseSession,makeSession} from './patient-data.js?v=4';
+import {defaultParams,sampleFit} from './geometry.js?v=5';
+import {emptyMetadata,sourceNames,sanitizeRecord,elevationToSag,parseSession,makeSession} from './patient-data.js?v=5';
 
 const $=id=>document.getElementById(id);
 const fmt=(n,d=1)=>typeof n==='number'&&Number.isFinite(n)?n.toFixed(d):'—';
