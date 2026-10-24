@@ -6,14 +6,17 @@
   <meta name="description" content="각막·동공 측정값을 수기로 입력하고 CRT 렌즈 조건을 환자별 A/B로 비교하는 설명용 3D 기하 도구">
   <link rel="canonical" href="https://cucube1985.github.io/cornea-crt-lab/"><meta property="og:url" content="https://cucube1985.github.io/cornea-crt-lab/">
   <title>CORNEA LAB · 각막과 CRT 렌즈</title>
-  <link rel="stylesheet" href="./style.css?v=3">
-  <link rel="stylesheet" href="./patient.css?v=3">
-  <link rel="stylesheet" href="./models.css?v=3">
+  <link rel="stylesheet" href="./style.css?v=4">
+  <link rel="stylesheet" href="./patient.css?v=4">
+  <link rel="stylesheet" href="./models.css?v=4">
+  <link rel="stylesheet" href="./access.css?v=4">
 </head>
 <body>
+  <p id="server-boot" class="access-boot" role="status">로그인 상태를 확인하고 있습니다…</p>
+  <div id="lab-app" hidden>
   <header class="topbar">
     <a class="brand" href="./" aria-label="Cornea Lab 홈"><span class="brand-icon"><svg viewBox="0 0 32 32" fill="none"><ellipse cx="16" cy="16" rx="13" ry="8" transform="rotate(-35 16 16)"/><ellipse cx="16" cy="16" rx="13" ry="8" transform="rotate(35 16 16)"/><circle cx="16" cy="16" r="3"/></svg></span><span>CORNEA<span class="brand-light"> LAB</span><small>ORTHOKERATOLOGY EXPLORER</small></span></a>
-    <div class="nav-context"><span class="nav-divider"></span><span>시뮬레이션 워크스페이스</span><span class="version">BETA 2.1</span></div>
+    <div class="nav-context"><span class="nav-divider"></span><span>시뮬레이션 워크스페이스</span><span class="version">BETA 3.0</span></div>
     <div class="top-actions"><button class="text-button" id="about-btn"><span class="info-icon">i</span> 모델 안내</button><a class="source-link" href="https://paragonvision.com/resources/fitting-guides-package-inserts/" target="_blank" rel="noopener noreferrer">설계 참고 ↗</a></div>
   </header>
   <main class="shell">
@@ -113,6 +116,8 @@
     </form>
   </dialog>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script type="module" src="./app.js?v=3"></script>
+  </div>
+  <noscript>로그인하려면 JavaScript를 활성화해 주세요.</noscript>
+  <script type="module" src="./server-entry.js?v=4"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
-import {defaultParams,sampleFit} from './geometry.js?v=3';
-import {emptyMetadata,sourceNames,sanitizeRecord,elevationToSag,parseSession,makeSession} from './patient-data.js?v=3';
+import {defaultParams,sampleFit} from './geometry.js?v=4';
+import {emptyMetadata,sourceNames,sanitizeRecord,elevationToSag,parseSession,makeSession} from './patient-data.js?v=4';
 
 const $=id=>document.getElementById(id);
 const fmt=(n,d=1)=>typeof n==='number'&&Number.isFinite(n)?n.toFixed(d):'—';
@@ -10,7 +10,9 @@ const heading=(n,title,group)=>`<div class="patient-group-title"><span>${n}</spa
 
 export function createPatientWorkspace({getParams,getFit,applyParams,toast}){
   let meta=emptyMetadata(),cases={A:null,B:null},snapshots={A:null,B:null},activeMeridian='flat';
-  const storage='cornea-lab-patient-v2',consent='cornea-lab-patient-optin';
+  const account=document.documentElement.dataset.account;
+  if(!account)throw new Error('Authenticated account context is required.');
+  const storage='cornea-lab-patient-v2:'+account,consent='cornea-lab-patient-optin:'+account;
   let keep=false;
   try{keep=localStorage.getItem(consent)==='true';}catch{}
 

@@ -1,8 +1,8 @@
-import {defaultParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js?v=3';
-import {createViewer} from './renderer.js?v=3';
+import {defaultParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js?v=4';
+import {createViewer} from './renderer.js?v=4';
 import {calculatorLinks,resultFields,parseCalculatorText} from './recommend.js';
-import {createPatientWorkspace} from './patient-ui.js?v=3';
-import {modelModes,modelParameters} from './model-modes.js?v=3';
+import {createPatientWorkspace} from './patient-ui.js?v=4';
+import {modelModes,modelParameters} from './model-modes.js?v=4';
 
 const $=id=>document.getElementById(id);
 const BASE={...defaultParams,flatK:42.5,steepK:44,clearance:.020};

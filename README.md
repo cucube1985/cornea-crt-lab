@@ -1,6 +1,8 @@
 # CORNEA LAB
 
-한국어 각막 / CRT 렌즈 교육용 3D 기하 탐색기. 빌드 과정 없이 동작하는 정적 ES module 웹 앱입니다.
+한국어 각막 / CRT 렌즈 교육용 3D 기하 탐색기. 서버 로그인과 관리자 계정 관리를 갖춘 Node.js 24 + ES module 웹 앱입니다.
+
+**서버 로그인은 `codex/server-login`에서 준비 중이며 아직 공개 사이트에 적용되지 않았습니다.** 실제 HTTPS 서버와 영구 저장소를 연결·검증한 후 기존 GitHub Pages를 로그인 서버로 안내하는 입구로 전환합니다. [서버 설정·계정 관리 안내](docs/server-login.md)를 확인하세요.
 
 ## 온라인
 
@@ -8,25 +10,26 @@ https://cucube1985.github.io/cornea-crt-lab/
 
 ## 소스 관리와 배포
 
-이 프로젝트는 [GitHub 저장소](https://github.com/cucube1985/cornea-crt-lab)의 `main` 브랜치를 기준으로 관리하고 GitHub Pages로 배포합니다.
+이 프로젝트의 소스는 [GitHub 저장소](https://github.com/cucube1985/cornea-crt-lab)에서 관리합니다. 서버 로그인 버전의 실제 앱은 Node HTTPS 서버가 제공하며, GitHub Pages는 로그인 서버로 안내하는 입구입니다.
 
-작업 순서는 **최신 소스 확인 → 수정 및 로컬 확인 → 테스트 → 커밋·푸시 → GitHub Actions 배포 확인**입니다. `main`에 푸시하면 [배포 워크플로](https://github.com/cucube1985/cornea-crt-lab/actions/workflows/pages.yml)가 `npm test`를 실행하고 `dist/`를 게시합니다. 브라우저 파일 선택기로 소스를 매번 올릴 필요는 없습니다.
+작업 순서는 **수정 및 로컬 확인 → 테스트 → 서버 배포·검증 → Pages 연결 → 공개 배포 확인**입니다. 인증 서버 준비 전에는 이 브랜치를 `main`에 합치지 않습니다. 서버가 준비되면 저장소 변수 `CORNEA_SERVER_ORIGIN`을 설정하고, [배포 워크플로](https://github.com/cucube1985/cornea-crt-lab/actions/workflows/pages.yml)는 `dist/` 대신 서버 안내 페이지만 게시합니다.
 
 ```powershell
 # 이 README가 있는 저장소 디렉터리에서 실행
-git pull --ff-only origin main
+git switch codex/server-login
+# 초기 관리자 설정 후 로컬 서버 실행
 npm start
-# 앱 수정 후
+# 앱 수정 후 (Node 24)
 npm test
-# 변경 내용을 검토한 뒤 필요한 파일만 커밋하고 푸시
-git push origin main
+# 서버 연결 전에는 작업 브랜치로만 푸시
+git push origin codex/server-login
 ```
 
-상위 작업 폴더와 이 앱의 Git 저장소가 다를 수 있으므로 이 README가 있는 디렉터리에서 작업합니다. 이전 배포의 `.openai/hosting.json`은 GitHub Pages 배포에 사용되지 않습니다. 이후 작업은 GitHub와 GitHub Pages를 사용합니다.
+상위 작업 폴더와 이 앱의 Git 저장소가 다를 수 있으므로 이 README가 있는 디렉터리에서 작업합니다. 이전 배포의 `.openai/hosting.json`은 현재 배포에 사용되지 않습니다. 소스는 GitHub에 보관하고, 실제 서비스는 인증 서버에서 제공합니다.
 
 ## 실행
 
-Node.js가 설치된 상태에서 이 디렉터리에서 `npm start` 실행 후 http://127.0.0.1:4173 에 접속합니다. ES module과 WebGL을 사용하므로 HTML을 파일 탐색기에서 직접 여는 대신 HTTP로 실행합니다. 배포 파일은 `dist/`에 있습니다. Three.js 0.170.0은 로컬 vendor에 포함하고 MIT 라이선스를 동봉했습니다. 폰트는 Google Fonts에서 로드하며 오프라인에서는 시스템 폰트로 표시합니다.
+Node.js 24에서 초기 관리자 비밀번호를 stdin으로 전달해 `npm run init-admin -- --password-stdin`을 실행한 뒤, `npm start` 후 http://127.0.0.1:4173 에 접속합니다. 초기 관리자 ID는 `admin`이며 실제 비밀번호는 소스에 포함하지 않습니다. 로그인 후 상단 **설정**에서 계정 추가, 활성/비활성 상태, 내 비밀번호 변경을 사용할 수 있습니다. 로그인하지 않은 요청의 앱 HTML/JS 접근도 서버에서 차단합니다. Three.js 0.170.0은 로컬 vendor에 포함하고 MIT 라이선스를 동봉했습니다. 폰트는 Google Fonts에서 로드하며 오프라인에서는 시스템 폰트로 표시합니다.
 
 ## 기능
 

@@ -1,7 +1,8 @@
 {
   "name": "cornea-crt-lab",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "private": true,
+  "engines": {"node": ">=24.0.0 <25"},
   "type": "module",
-  "scripts": { "start": "node server.mjs", "test": "node geometry-tests.mjs && node patient-tests.mjs && node model-tests.mjs" }
+  "scripts": { "start": "node server.mjs", "init-admin": "node scripts/init-admin.mjs", "test": "node geometry-tests.mjs && node patient-tests.mjs && node model-tests.mjs && node auth-tests.mjs" }
 }
