@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f7f9">
+  <meta name="description" content="ARK 각막 곡률과 Paragon CRT 파라미터를 3D로 탐색하는 교육용 기하 시뮬레이터">
+  <link rel="canonical" href="https://cornea-crt-lab-kr.cucube.chatgpt.site"><meta property="og:url" content="https://cornea-crt-lab-kr.cucube.chatgpt.site">
+  <title>CORNEA LAB · 각막과 CRT 렌즈</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Cornea Lab 홈"><span class="brand-icon"><svg viewBox="0 0 32 32" fill="none"><ellipse cx="16" cy="16" rx="13" ry="8" transform="rotate(-35 16 16)"/><ellipse cx="16" cy="16" rx="13" ry="8" transform="rotate(35 16 16)"/><circle cx="16" cy="16" r="3"/></svg></span><span>CORNEA<span class="brand-light"> LAB</span><small>ORTHOKERATOLOGY EXPLORER</small></span></a>
+    <div class="nav-context"><span class="nav-divider"></span><span>시뮬레이션 워크스페이스</span><span class="version">BETA 1.0</span></div>
+    <div class="top-actions"><button class="text-button" id="about-btn"><span class="info-icon">i</span> 모델 안내</button><a class="source-link" href="https://paragonvision.com/resources/fitting-guides-package-inserts/" target="_blank" rel="noopener noreferrer">설계 참고 ↗</a></div>
+  </header>
+  <main class="shell">
+    <section class="page-heading">
+      <div><div class="eyebrow">FROM CURVATURE TO FORM</div><h1>각막과 렌즈, 입체로 이해하다<span class="title-dot">.</span></h1><p>각막의 곡률부터 CRT 렌즈의 구조, 두 표면 사이의 간격까지 탐색하세요.</p></div>
+      <div class="heading-actions"><span class="live-state"><i></i> 실시간 모델</span><button class="button subtle" id="reset-btn"><span aria-hidden="true">↺</span> 초기화</button><button class="button primary" id="export-btn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 2v10m-4-4 4 4 4-4M3 12v5h14v-5"/></svg>설정 저장</button></div>
+    </section>
+    <div class="notice"><span class="notice-mark">!</span><span><strong>교육용 기하 모델</strong> · ARK만으로 실제 각막 전체를 재현할 수 없습니다. 실제 피팅·압력·치료 결과를 예측하는 도구가 아닙니다.</span><button id="notice-more">가정 보기 <span>↗</span></button></div>
+    <div class="workspace">
+      <aside class="parameters">
+        <div class="panel-top"><h2>모델 파라미터</h2><span class="tiny-label">INPUT</span></div>
+        <div class="parameter-scroll">
+          <section class="input-section" id="cornea-section"><div class="section-heading"><span class="section-number teal">01</span><h3>ARK 각막 데이터</h3><span class="section-badge">전면</span></div>
+            <div class="field-pair">
+              <label class="field">Flat K<div class="number-wrap"><input id="flatK" type="number" min="35" max="55" step="0.25" value="42.50"><span>D</span></div></label>
+              <label class="field">Steep K<div class="number-wrap"><input id="steepK" type="number" min="35" max="55" step="0.25" value="44.00"><span>D</span></div></label>
+            </div>
+            <div class="radii-note"><span>반경 <b id="flat-radius">7.94</b> mm</span><span>반경 <b id="steep-radius">7.67</b> mm</span></div>
+            <label class="field slider-label" for="steepAxis"><span>Steep axis <span class="muted">급경사 축</span></span><div class="mini-number"><input id="steepAxis" type="number" min="0" max="180" step="1" value="90"><span>°</span></div></label>
+            <input aria-label="Steep axis 슬라이더" class="slider teal-slider" id="steepAxis-range" type="range" min="0" max="180" step="1" value="90">
+            <div class="range-labels"><span>0°</span><span>90°</span><span>180°</span></div>
+            <div class="axis-note"><span>Flat axis <b id="flat-axis">0°</b></span><span>주경선 직교 가정</span></div>
+            <details class="advanced"><summary>각막 모델 가정 <span>＋</span></summary><div class="advanced-content"><label class="field slider-label" for="q"><span>비구면도 Q</span><div class="mini-number"><input id="q" type="number" min="-0.8" max="0" step="0.05" value="-0.25"></div></label><p>K로 측정한 값이 아닙니다. 기본 Q = −0.25, 각막 표시 직경 11.8 mm를 가정합니다.</p><p>축은 화면 오른쪽 0°에서 반시계방향으로 표시합니다. OD/OS 영상 방향은 별도 변환하지 않습니다.</p></div></details>
+          </section>
+          <section class="input-section" id="lens-section"><div class="section-heading"><span class="section-number blue">02</span><h3>CRT 렌즈 설계</h3><span class="section-badge">근사 모델</span></div>
+            <label class="field slider-label" for="bc"><span>Base curve <span class="muted">BC</span></span><div class="mini-number"><input id="bc" type="number" min="7.5" max="10.5" step="0.1" value="8.6"><span>mm</span></div></label>
+            <input aria-label="Base curve 슬라이더" class="slider" id="bc-range" type="range" min="7.5" max="10.5" step="0.1" value="8.6">
+            <div class="range-labels"><span>7.5</span><span>10.5 mm</span></div>
+            <div class="field-pair spaced">
+              <label class="field">Return zone <span class="muted">RZD</span><div class="number-wrap"><input id="rzd" type="number" min="400" max="700" step="25" value="550"><span>µm</span></div></label>
+              <label class="field">Landing zone <span class="muted">LZA</span><div class="number-wrap"><input id="lza" type="number" min="25" max="45" step="1" value="33"><span>°</span></div></label>
+            </div>
+            <label class="field diameter-label">전체 직경 <span class="muted">OAD</span></label>
+            <div class="segmented diameter" role="group" aria-label="렌즈 직경"><button data-diameter="10.5" class="active" aria-pressed="true">10.5 <span>mm</span></button><button data-diameter="11" aria-pressed="false">11.0 <span>mm</span></button></div>
+            <div class="zone-key"><span><i class="zone-bc"></i>BC</span><span><i class="zone-rz"></i>Return</span><span><i class="zone-lz"></i>Landing</span></div>
+            <p class="small-note">구면 중심부 Ø6 mm · Return 폭 1 mm<br>LZA는 각도의 절댓값으로 입력합니다.</p>
+          </section>
+          <section class="input-section fit-section"><div class="section-heading"><span class="section-number purple">03</span><h3>렌즈 위치</h3></div>
+            <div class="field-pair"><label class="field">수평 이동<div class="number-wrap"><input id="offsetX" type="number" min="-1" max="1" step="0.1" value="0"><span>mm</span></div></label><label class="field">수직 이동<div class="number-wrap"><input id="offsetY" type="number" min="-1" max="1" step="0.1" value="0"><span>mm</span></div></label></div>
+            <div class="field-pair spaced"><label class="field">X 방향 기울기<div class="number-wrap"><input id="tiltX" type="number" min="-5" max="5" step="0.25" value="0"><span>°</span></div></label><label class="field">Y 방향 기울기<div class="number-wrap"><input id="tiltY" type="number" min="-5" max="5" step="0.25" value="0"><span>°</span></div></label></div>
+            <label class="switch-row"><span>기하학적 자동 안착</span><input id="autoSeat" type="checkbox" checked role="switch"><span class="switch-ui"></span></label>
+            <label class="field slider-label clearance-label" for="clearance"><span>꼭짓점 높이 <span class="muted">수동</span></span><div class="mini-number"><input id="clearance" type="number" min="-100" max="500" step="5" value="20" disabled><span>µm</span></div></label><p class="small-note">자동 안착은 수직 이동만 조절하여 샘플 최소 간격을 2 µm로 맞춥니다. 힘·유체 계산은 포함하지 않습니다.</p>
+          </section>
+        </div>
+        <div class="parameter-footer"><span class="privacy-dot"></span>입력값은 이 브라우저에만 저장됩니다</div>
+      </aside>
+      <div class="visual-column">
+        <section class="viewer-panel panel">
+          <div class="viewer-top"><div class="mode-tabs" role="tablist" aria-label="모델 보기"><button class="mode-tab" id="tab-cornea" data-mode="cornea" role="tab" aria-selected="false">각막</button><button class="mode-tab" id="tab-lens" data-mode="lens" role="tab" aria-selected="false">CRT 렌즈</button><button class="mode-tab active" id="tab-fit" data-mode="fit" role="tab" aria-selected="true">피팅 시뮬레이션</button></div><div class="viewer-tag"><span></span>3D VIEW</div></div>
+          <div class="viewer" id="viewer" role="img" aria-label="마우스로 회전하고 스크롤로 확대하는 3D 각막 및 렌즈 모델"></div>
+          <div class="scene-heading"><span class="scene-kicker" id="scene-kicker">CORNEA × CRT</span><h2 id="scene-title">두 표면 사이의 공간</h2><p id="scene-description">각막 전면과 렌즈 후면의 기하학적 관계</p></div>
+          <div class="view-controls" role="group" aria-label="카메라 방향"><button class="active" data-view="perspective" title="입체 보기">입체</button><button data-view="top" title="정면 보기">정면</button><button data-view="side" title="단면 방향">측면</button></div>
+          <div class="scene-legend"><span><i class="legend-cornea"></i>각막 전면</span><span><i class="legend-lens"></i>렌즈 후면</span></div>
+          <div class="viewer-bottom"><span class="gesture-hint"><svg viewBox="0 0 20 20" fill="none"><rect x="5" y="2" width="10" height="16" rx="5"/><path d="M10 2v6"/></svg>드래그 회전 · 스크롤 확대</span><span id="scene-scale">실제 비율 ×1</span></div>
+          <div class="viewer-options"><label><input id="exploded" type="checkbox"><span>분리 보기</span></label><label><input id="wireframe" type="checkbox"><span>메시</span></label><label><input id="showClearance" type="checkbox"><span>간격 색상</span></label><label class="depth-select">깊이 <select id="scale" aria-label="깊이 배율"><option value="1">×1</option><option value="2">×2</option><option value="4">×4</option></select></label></div>
+          <div id="exploded-note" class="exploded-note" hidden>분리 보기: 렌즈를 띄워 표시합니다. 분석값은 원래 위치 기준입니다.</div>
+        </section>
+        <section class="profile-panel panel"><div class="chart-heading"><div><h2>주경선 단면</h2><p>같은 축에서 비교하는 두 표면</p></div><div class="segmented small" role="group" aria-label="단면 주경선"><button data-meridian="flat" class="active">Flat</button><button data-meridian="steep">Steep</button></div></div><div class="profile-wrap"><canvas id="profile-canvas" aria-label="각막 및 렌즈 단면 그래프"></canvas></div><div class="chart-foot"><span><i class="line-key cornea-line"></i>각막 전면 <i class="line-key lens-line"></i>렌즈 후면</span><span id="profile-axis">0° 주경선 · 단위 mm</span></div></section>
+      </div>
+      <aside class="analysis-column">
+        <section class="analysis-panel panel"><div class="panel-top"><h2>기하학적 분석</h2><span class="tiny-label">LIVE</span></div><div class="metric-primary"><span>각막 난시 차이</span><div><b id="astig-value">1.50</b><span>D</span><span class="metric-chip">ΔK</span></div><small id="axis-summary">Flat 0° / Steep 90°</small></div><div class="metric-grid"><div><span>렌즈 중심 간격</span><strong id="central-gap">—</strong><small>µm</small></div><div><span>말단부 평균</span><strong id="edge-gap">—</strong><small>µm</small></div></div><div class="metric-context">수직 간격 · 렌즈 후면 − 각막 전면</div></section>
+        <section class="map-panel panel"><div class="map-heading"><h2>간격 지도</h2><span>정면 투영</span></div><div class="map-wrap"><canvas id="gap-canvas" aria-label="렌즈 아래 수직 간격의 색상 지도"></canvas><span class="map-axis axis-top">90°</span><span class="map-axis axis-right">0°</span></div><div class="color-scale"></div><div class="color-labels"><span>간섭 &lt;0</span><span>100</span><span>≥250 µm</span></div><p>색: 수직 간격 · ＋: 각막 정점<br>빈 영역: 계산 불가 · 형광 패턴 아님</p></section>
+        <section class="insights-panel panel"><div class="insight-heading"><span class="spark">✧</span><h2>모델에서 살펴볼 점</h2></div><div id="insights" aria-live="polite"></div><div class="analysis-disclaimer">접촉·압력·고착·탈중심 발생 여부는 이 모델로 판단할 수 없습니다.</div></section>
+      </aside>
+    </div>
+    <section class="scenario-bar"><div><span class="scenario-icon">◈</span><strong>비교 시나리오</strong><span class="scenario-help">파라미터 변화가 만드는 형태 차이</span></div><div class="scenario-buttons"><button data-preset="baseline" class="selected">기본 정렬</button><button data-preset="astig">난시 차이 증가</button><button data-preset="decenter">중심 이탈</button><button data-preset="tilt">기울어진 렌즈</button><button data-preset="interference">표면 간섭</button></div></section>
+    <footer class="page-footer"><span>CORNEA LAB <span class="footer-line">/</span> Educational geometry explorer</span><span>Paragon CRT® 구조를 참고한 비공식 근사 모델 <span class="footer-line">·</span><button id="footer-about">계산 방법 및 출처 ↗</button></span></footer>
+  </main>
+  <dialog id="about-dialog"><div class="dialog-heading"><div class="eyebrow">MODEL NOTES</div><button id="close-about" class="icon-button" aria-label="안내 닫기">×</button><h2>이 모델을 읽는 방법</h2><p>관찰 가능한 기하학과 실제 임상 피팅의 경계를 구분합니다.</p></div><div class="dialog-body"><h3>01 / 각막: K값을 표면으로</h3><p>각막계 굴절률 1.3375를 사용하는 관례적 환산식 <code>R(mm) = 337.5 / K(D)</code>으로 두 주경선 반경을 구합니다. 서로 직교하는 Flat/Steep 축을 비구면 표면에 적용합니다. Q = −0.25는 조절 가능한 가정값입니다. 표시 직경 11.8 mm는 고정입니다.</p><p>ARK의 K값과 축만으로는 주변부 높이, 비대칭, 국소 불규칙성, 후면, 두께를 알 수 없습니다. 실제 3D 재현에는 각막 지형도·단층촬영 또는 고도 데이터가 필요합니다. 렌즈 이동 시 표시 각막 밖 영역은 같은 수학 표면으로 외삽합니다.</p><h3>02 / CRT: 공개된 구조를 참고한 근사</h3><p>구면 중심부, S자형 Return zone, 직선 기울기의 Landing zone, 말단 들림을 갖는 회전대칭 후면을 표현합니다. 중심 광학부 직경 6 mm, Return 폭 1 mm를 고정하고 전체 직경 10.5 / 11.0 mm를 비교합니다. BC는 반경(mm), RZD는 깊이(µm), LZA는 각도의 절댓값(°)입니다.</p><p>Return zone 반경 3→4 mm에서 RZD만큼 깊어지는 5차 보간 곡선을 사용합니다. 말단 0.35 mm의 25 µm 들림은 별도 가정입니다. 제조사 CAD·가공 식을 복원한 모델이 아니며, 앞면과 렌즈 두께는 시각화 목적입니다. 입력 범위는 탐색용으로 실제 주문 가능 조합을 뜻하지 않습니다. 이 버전은 단일 축 렌즈 모델이며 Dual Axis 설계를 포함하지 않습니다.</p><h3>03 / 피팅: 정적 수직 간격</h3><p><code>gap = lens posterior z − corneal anterior z</code>입니다. 자동 안착은 유한 격자에서 최소 간격이 약 2 µm가 되도록 렌즈를 수직 이동시킵니다. 실제 착용 위치·안정성·최소거리·힘의 평형을 계산하지 않으며, 격자 사이 간섭을 놓칠 수 있습니다. 수동 모드의 꼭짓점 높이는 각막 꼭짓점 z=0을 기준으로 한 렌즈 꼭짓점 높이입니다. 기울기는 X/Y 방향의 평면 기울기로 근사하며 강체 회전은 아닙니다.</p><p>간격 &lt; 0은 수학적 표면 간섭입니다. 렌즈 침투나 조직 손상을 뜻하지 않습니다. 지도와 수치는 눈물층 유체역학·눈꺼풀 힘·각막 변형·야간 움직임·치료 후 변화를 계산하지 않으므로 실제 형광 패턴, 피팅 문제, 시력 개선을 예측하지 않습니다. 별도 임상 검증을 거치지 않았습니다.</p><h3>공식 참고 자료</h3><ul><li><a href="https://paragonvision.com/resources/fitting-guides-package-inserts/" target="_blank" rel="noopener noreferrer">Paragon Vision Sciences · Fitting guides & package inserts ↗</a></li><li><a href="https://www.accessdata.fda.gov/cdrh_docs/pdf5/P050031C.pdf" target="_blank" rel="noopener noreferrer">FDA · Paragon CRT 100 package insert ↗</a></li><li><a href="https://www.accessdata.fda.gov/cdrh_docs/pdf/P870024S043c.pdf" target="_blank" rel="noopener noreferrer">FDA · Professional fitting information ↗</a></li><li><a href="https://www.nidek.co.jp/wp-content/uploads/2024/02/ARK_1_AR_1_B01J005.pdf" target="_blank" rel="noopener noreferrer">NIDEK · ARK-1 keratometry specifications ↗</a></li></ul><p class="small-note">본 도구는 Paragon 또는 CooperVision의 공식 제품이 아닙니다. 실제 렌즈 선택과 피팅은 제조사 지침과 전문 검사를 따릅니다.</p></div></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
