@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import {createGeometrySampler} from './geometry.js?v=2';
+import {createGeometrySampler} from './geometry.js?v=3';
 
 // All model coordinates are millimetres. The model's anterior axis (z) is
 // Three's vertical axis (y); the camera is the only thing that is rotated.

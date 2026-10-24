@@ -15,7 +15,7 @@
 - Run `npm start` for the local preview at http://127.0.0.1:4173.
 - Run `npm test` for applicable geometry and recommendation checks before publishing application changes. Documentation-only changes do not require extra tests.
 - Keep asset and module URLs relative so they work under the `/cornea-crt-lab/` project path.
-- Browser asset/module URLs currently use a shared `?v=2` release suffix. Update it consistently on future releases to avoid mixing cached old geometry with new UI modules.
+- Browser asset/module URLs currently use a shared `?v=3` release suffix. Update it consistently on future releases to avoid mixing cached old geometry with new UI modules.
 - Preserve the educational model assumptions and distinguish calculated geometry from clinically validated predictions.
 
 ## Publishing

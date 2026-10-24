@@ -1,13 +1,16 @@
-import {defaultParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js?v=2';
-import {createViewer} from './renderer.js?v=2';
+import {defaultParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js?v=3';
+import {createViewer} from './renderer.js?v=3';
 import {calculatorLinks,resultFields,parseCalculatorText} from './recommend.js';
-import {createPatientWorkspace} from './patient-ui.js?v=2';
+import {createPatientWorkspace} from './patient-ui.js?v=3';
+import {modelModes,modelParameters} from './model-modes.js?v=3';
 
 const $=id=>document.getElementById(id);
 const BASE={...defaultParams,flatK:42.5,steepK:44,clearance:.020};
 const numberKeys=['flatK','steepK','steepAxis','q','bc','rzd','lza','offsetX','offsetY','tiltX','tiltY','clearance'];
-let params={...BASE},fit,mode='fit',meridian='flat',viewer,updateTimer,toastTimer,patientWorkspace;
+let params={...BASE},fit,model='advanced',mode='fit',meridian='flat',viewer,updateTimer,toastTimer,patientWorkspace;
 const options={mode,scale:1,exploded:false,wireframe:false,showClearance:false,showAxes:true,showPupil:true};
+const viewOptions=()=>({...options,showPupil:model==='advanced'&&options.showPupil,showClearance:mode==='fit'&&options.showClearance,exploded:mode==='fit'&&options.exploded});
+function updateViewer(){if(fit)viewer?.update(fit.params,fit,viewOptions());}
 
 // Patient inputs stay in memory unless the comparison panel's device-storage option is enabled.
 
@@ -22,7 +25,7 @@ function syncInputs(){
 function paintRange(input){input.style.setProperty('--progress',((Number(input.value)-Number(input.min))/(Number(input.max)-Number(input.min))*100)+'%');}
 function clearPreset(){document.querySelectorAll('[data-preset]').forEach(b=>b.classList.remove('selected'));}
 function validate(){
-  const reversed=params.flatK>params.steepK;
+  const reversed=model!=='ok'&&params.flatK>params.steepK;
   $('flatK').setAttribute('aria-invalid',String(reversed));$('steepK').setAttribute('aria-invalid',String(reversed));
   $('input-error').hidden=!reversed;
   return !reversed;
@@ -31,10 +34,10 @@ function schedule(){clearTimeout(updateTimer);updateTimer=setTimeout(recalculate
 function recalculate(){
   if(!validate())return false;
   try{
-    fit=sampleFit(params);
-    viewer?.update(params,fit,options);
+    fit=sampleFit(modelParameters(params,model));
+    updateViewer();
     updateReadout();drawProfile();drawMap();
-    patientWorkspace?.update(params,fit);
+    if(model==='advanced')patientWorkspace?.update(params,fit);
     return true;
   }catch(error){toast('모델을 계산할 수 없습니다. 입력 범위를 확인해 주세요.');console.error(error);return false;}
 }
@@ -56,12 +59,13 @@ function updateReadout(){
   const a=fit.anterior;
   $('pupil-distance').textContent=format(a.pupilToLens,2);
   $('pupil-overlap').textContent=a.pupilOverlap===null?'—':format(a.pupilOverlap*100,1);
-  $('pupil-overlap-note').textContent=params.treatmentDiameter===null?'치료 영역 미입력 · BC 직경을 대신 쓰지 않습니다.':'별도 입력한 치료 영역과의 평면 겹침 · 시력 예측 아님';
+  $('pupil-overlap-note').textContent=p.treatmentDiameter===null?'치료 영역 미입력 · BC 직경을 대신 쓰지 않습니다.':'별도 입력한 치료 영역과의 평면 겹침 · 시력 예측 아님';
   $('insights').replaceChildren(...insights.map(item=>{const div=document.createElement('div');div.className='insight '+item.tone;const strong=document.createElement('strong');strong.textContent=item.title;const paragraph=document.createElement('p');paragraph.textContent=item.body;div.append(strong,paragraph);return div;}));
 }
 function updateSceneLegend(){
-  $('pupil-legend').hidden=!options.showPupil||mode==='lens';
-  $('treatment-legend').hidden=!options.showPupil||mode==='lens'||params.treatmentDiameter===null;
+  const spans=document.querySelectorAll('.scene-legend>span');spans[0].hidden=mode==='lens';spans[1].hidden=mode==='cornea';
+  $('pupil-legend').hidden=!viewOptions().showPupil||mode==='lens';
+  $('treatment-legend').hidden=!viewOptions().showPupil||mode==='lens'||fit.params.treatmentDiameter===null;
 }
 
 // A single distance palette is used in the 2D map and the 3D surface overlay.
@@ -78,7 +82,7 @@ function setupCanvas(canvas){
   const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);return{ctx,width,height};
 }
 function drawMap(){
-  if(!fit)return;
+  if(!fit||$('gap-canvas').closest('[hidden]'))return;
   const {ctx,width:w,height:h}=setupCanvas($('gap-canvas'));const radius=Math.min(w,h)*.418,cx=w/2,cy=h/2;
   const grid=fit.grid,n=grid.size,cell=2*radius/(n-1);
   ctx.save();ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);ctx.clip();
@@ -93,7 +97,7 @@ function drawMap(){
   // The cross marks the corneal apex relative to the lens-local footprint.
   const ax=cx-params.offsetX/(params.diameter/2)*radius,ay=cy+params.offsetY/(params.diameter/2)*radius;
   ctx.strokeStyle='#365561';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ax-3,ay);ctx.lineTo(ax+3,ay);ctx.moveTo(ax,ay-3);ctx.lineTo(ax,ay+3);ctx.stroke();
-  if(options.showPupil){
+  if(viewOptions().showPupil){
     const projected=(x,y,r,color,dash=false)=>{ctx.beginPath();ctx.arc(cx+(x-params.offsetX)/(params.diameter/2)*radius,cy-(y-params.offsetY)/(params.diameter/2)*radius,r/(params.diameter/2)*radius,0,Math.PI*2);ctx.strokeStyle=color;ctx.lineWidth=1.2;ctx.setLineDash(dash?[3,2]:[]);ctx.stroke();ctx.setLineDash([]);};
     projected(params.pupilX,params.pupilY,fit.anterior.pupilDiameter/2,'#9260af');
     if(params.treatmentDiameter!==null)projected(params.treatmentX,params.treatmentY,params.treatmentDiameter/2,'#b98540',true);
@@ -104,7 +108,7 @@ function drawProfile(){
   const {ctx,width:w,height:h}=setupCanvas($('profile-canvas'));const data=fit.meridians[meridian];
   const margin={left:33,right:10,top:17,bottom:22},cw=w-margin.left-margin.right,ch=h-margin.top-margin.bottom;
   const span=Math.max(...data.map(s=>Math.abs(s.r)));
-  const all=data.flatMap(s=>[s.corneaZ,s.lensZ]).filter(Number.isFinite);
+  const all=data.flatMap(s=>mode==='cornea'?[s.corneaZ]:mode==='lens'?[s.lensZ]:[s.corneaZ,s.lensZ]).filter(Number.isFinite);
   const min=Math.min(...all)-.1,max=Math.max(...all)+.12;
   const X=x=>margin.left+(x+span)/(span*2)*cw,Y=y=>margin.top+(max-y)/(max-min)*ch;
   ctx.font='8px "DM Sans",sans-serif';ctx.fillStyle='#acb7c0';ctx.textAlign='right';ctx.textBaseline='middle';
@@ -116,9 +120,9 @@ function drawProfile(){
   const pathFor=key=>{ctx.beginPath();let started=false;data.forEach(s=>{if(!Number.isFinite(s[key])){started=false;return;}if(!started){ctx.moveTo(X(s.r),Y(s[key]));started=true;}else ctx.lineTo(X(s.r),Y(s[key]));});};
   // Shaded central optic and return-zone chord guides, referenced to lens pose.
   const angle=fit.params[meridian==='flat'?'flatAxis':'steepAxis']*Math.PI/180;
-  const along=params.offsetX*Math.cos(angle)+params.offsetY*Math.sin(angle);
-  const perpendicular=-params.offsetX*Math.sin(angle)+params.offsetY*Math.cos(angle);
-  for(const r of [4,3])if(Math.abs(perpendicular)<r){const half=Math.sqrt(r*r-perpendicular*perpendicular);ctx.fillStyle=r===4?'#d8e7f515':'#e0f0ed30';ctx.fillRect(X(along-half),margin.top,X(along+half)-X(along-half),ch);}
+  const along=fit.params.offsetX*Math.cos(angle)+fit.params.offsetY*Math.sin(angle);
+  const perpendicular=-fit.params.offsetX*Math.sin(angle)+fit.params.offsetY*Math.cos(angle);
+  for(const r of mode==='cornea'?[]:[4,3])if(Math.abs(perpendicular)<r){const half=Math.sqrt(r*r-perpendicular*perpendicular);ctx.fillStyle=r===4?'#d8e7f515':'#e0f0ed30';ctx.fillRect(X(along-half),margin.top,X(along+half)-X(along-half),ch);}
   if(mode!=='lens'){pathFor('corneaZ');ctx.lineWidth=1.8;ctx.strokeStyle='#62a99e';ctx.stroke();}
   if(mode!=='cornea'){pathFor('lensZ');ctx.lineWidth=1.7;ctx.strokeStyle='#7f9fc9';ctx.stroke();}
   ctx.setLineDash([3,4]);ctx.strokeStyle='#c8d8de';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(X(0),margin.top);ctx.lineTo(X(0),h-margin.bottom);ctx.stroke();ctx.setLineDash([]);
@@ -126,13 +130,39 @@ function drawProfile(){
 }
 
 function setMode(next){
-  mode=next;options.mode=mode;
+  mode=model==='advanced'?next:modelModes[model].view;options.mode=mode;
   document.querySelectorAll('[data-mode]').forEach(b=>{const active=b.dataset.mode===mode;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));});
-  const text={cornea:['CORNEAL SURFACE','곡률이 만드는 각막 형태','ARK의 두 주경선으로 구성한 이상화된 전면'],lens:['CRT LENS DESIGN','세 구역, 하나의 렌즈','BC · Return zone · Landing zone의 후면 구조'],fit:['CORNEA × CRT','두 표면 사이의 공간','각막 전면과 렌즈 후면의 기하학적 관계']}[mode];
-  $('scene-kicker').textContent=text[0];$('scene-title').textContent=text[1];$('scene-description').textContent=text[2];
-  document.querySelectorAll('.scene-legend>span')[0].style.opacity=mode==='lens'?'.35':'1';document.querySelectorAll('.scene-legend>span')[1].style.opacity=mode==='cornea'?'.35':'1';
-  viewer?.update(params,fit,options);drawProfile();
-  updateSceneLegend();
+  const text={cornea:['CORNEAL SURFACE','곡률이 만드는 각막 형태','추가 전안부 조건을 반영한 근사 각막 전면'],lens:['CRT LENS DESIGN','세 구역, 하나의 렌즈','BC · Return zone · Landing zone의 후면 구조'],fit:['CORNEA × CRT','두 표면 사이의 공간','각막 전면과 렌즈 후면의 기하학적 관계']}[mode];
+  $('scene-kicker').textContent=modelModes[model].name.toUpperCase()+' / '+text[0];$('scene-title').textContent=text[1];$('scene-description').textContent=model==='advanced'?text[2]:model==='ok'?'BC · RZD · LZA · 직경으로 구성한 렌즈 후면':model==='basic'?'Flat K · Steep K · 축 / Q −0.25 · 직경 11.8 mm 고정':'Basic 각막과 CRT 렌즈 사이의 정적 수직 간격';
+  updateModelPanels();updateViewer();drawProfile();
+  if(fit){updateSceneLegend();drawMap();}
+}
+function updateModelPanels(){
+  const advanced=model==='advanced',fitting=mode==='fit';
+  document.body.dataset.model=model;
+  const hide=(selector,hidden)=>document.querySelectorAll(selector).forEach(el=>el.hidden=hidden);
+  hide('#patient-summary,#patient-comparison,#export-btn,#cornea-section .advanced',!advanced);
+  hide('.mode-tabs',!advanced);$('model-view-label').hidden=advanced;$('model-view-label').textContent=modelModes[model].name+' 모델';
+  hide('#cornea-section',model==='ok');hide('#lens-section',model==='basic');hide('.fit-section,.scenario-bar',!fitting);
+  hide('#recommend-btn',!advanced);hide('.analysis-column',mode==='lens');
+  hide('.analysis-panel .metric-grid,.analysis-panel .metric-context,.map-panel,.insights-panel',!fitting);
+  for(const id of ['exploded','showClearance'])$(id).closest('label').hidden=!fitting;
+  $('showPupil').closest('label').hidden=!advanced||mode==='lens';
+  $('exploded-note').hidden=!fitting||!options.exploded;
+  $('profile-series').innerHTML=(mode!=='lens'?'<i class="line-key cornea-line"></i>각막 전면':'')+(mode!=='cornea'?'<i class="line-key lens-line"></i>렌즈 후면':'');
+  document.querySelector('.profile-panel h2').textContent=mode==='lens'?'렌즈 중심 단면':'주경선 단면';
+  document.querySelector('[aria-label="단면 주경선"]').hidden=mode==='lens';
+  $('profile-description').textContent=mode==='cornea'?(advanced?'추가 전안부 조건을 반영한 각막 전면':'ARK 두 주경선의 각막 전면'):mode==='lens'?'CRT 렌즈 후면의 중심 단면':'같은 축에서 비교하는 두 표면';
+  $('profile-canvas').setAttribute('aria-label',mode==='cornea'?'각막 전면 단면 그래프':mode==='lens'?'렌즈 후면 단면 그래프':'각막 및 렌즈 단면 그래프');
+  $('gap-description').textContent='색: 수직 간격 · ＋: 각막 정점'+(advanced?' · 보라: 동공 투영':'')+' / 빈 영역: 계산 불가 · 형광 패턴 아님';
+}
+function selectModel(next){
+  if(!Object.hasOwn(modelModes,next))return;
+  if(params.flatK>params.steepK){validate();toast('Steep K를 Flat K 이상으로 입력한 뒤 모델을 선택해 주세요.');return;}
+  const previous=model,previousMode=mode;model=next;setMode(modelModes[model].view);
+  if(!recalculate()){model=previous;setMode(previousMode);recalculate();return;}
+  document.querySelectorAll('button[data-model]').forEach(button=>{const active=button.dataset.model===model;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
+  $('model-description').textContent=modelModes[model].description;
 }
 const error=document.createElement('p');error.id='input-error';error.hidden=true;error.className='input-error';error.setAttribute('role','alert');error.textContent='Steep K를 Flat K 이상으로 입력해 주세요. 모델은 마지막 유효한 값으로 표시됩니다.';$('cornea-section').querySelector('.radii-note').after(error);
 
@@ -166,17 +196,18 @@ for(const key of ['steepAxis','bc'])$(key+'-range').addEventListener('input',eve
 $('autoSeat').addEventListener('change',()=>{params.autoSeat=$('autoSeat').checked;$('clearance').disabled=params.autoSeat;if(!params.autoSeat&&fit){params.clearance=Math.max(-.1,Math.min(.5,Math.round(fit.clearance*1000/5)*5/1000));$('clearance').value=Math.round(params.clearance*1000);}clearPreset();recalculate();});
 document.querySelectorAll('[data-diameter]').forEach(button=>button.addEventListener('click',()=>{params.diameter=Number(button.dataset.diameter);clearPreset();syncInputs();recalculate();}));
 document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>setMode(button.dataset.mode)));
+document.querySelectorAll('button[data-model]').forEach(button=>button.addEventListener('click',()=>selectModel(button.dataset.model)));
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{viewer?.setView(button.dataset.view);document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b===button));}));
 document.querySelectorAll('[data-meridian]').forEach(button=>button.addEventListener('click',()=>{meridian=button.dataset.meridian;document.querySelectorAll('[data-meridian]').forEach(b=>b.classList.toggle('active',b===button));updateReadout();drawProfile();}));
-for(const key of ['exploded','wireframe','showClearance','showPupil'])$(key).addEventListener('change',()=>{options[key]=$(key).checked;$('exploded-note').hidden=!options.exploded;viewer?.update(params,fit,options);drawMap();updateSceneLegend();});
-$('scale').addEventListener('change',()=>{options.scale=Number($('scale').value);$('scene-scale').textContent=options.scale===1?'실제 비율 ×1':`깊이 강조 ×${options.scale} · 수직축만 확대`;viewer?.update(params,fit,options);});
+for(const key of ['exploded','wireframe','showClearance','showPupil'])$(key).addEventListener('change',()=>{options[key]=$(key).checked;$('exploded-note').hidden=mode!=='fit'||!options.exploded;updateViewer();drawMap();updateSceneLegend();});
+$('scale').addEventListener('change',()=>{options.scale=Number($('scale').value);$('scene-scale').textContent=options.scale===1?'실제 비율 ×1':`깊이 강조 ×${options.scale} · 수직축만 확대`;updateViewer();});
 document.querySelectorAll('[data-preset]').forEach(button=>button.addEventListener('click',()=>{
   const preset=button.dataset.preset;
   const centered={offsetX:0,offsetY:0,tiltX:0,tiltY:0,autoSeat:true};
   const patches={baseline:centered,astig:{...centered,flatK:42,steepK:45},decenter:{...centered,offsetX:.6,offsetY:.3},tilt:{...centered,tiltX:1.5,tiltY:-.75},interference:{...centered,autoSeat:false,clearance:-.02}};
   params={...params,...patches[preset]};syncInputs();setMode('fit');recalculate();
   document.querySelectorAll('[data-preset]').forEach(b=>b.classList.toggle('selected',b===button));
-  if(preset==='interference'){options.showClearance=true;$('showClearance').checked=true;viewer?.update(params,fit,options);}
+  if(preset==='interference'){options.showClearance=true;$('showClearance').checked=true;updateViewer();}
 }));
 $('reset-btn').addEventListener('click',()=>{params={...BASE};Object.assign(options,{mode:'fit',scale:1,exploded:false,wireframe:false,showClearance:false,showPupil:true});$('showPupil').checked=true;for(const key of ['exploded','wireframe','showClearance'])$(key).checked=false;$('scale').value='1';$('exploded-note').hidden=true;$('scene-scale').textContent='실제 비율 ×1';meridian='flat';document.querySelectorAll('[data-meridian]').forEach(b=>b.classList.toggle('active',b.dataset.meridian==='flat'));syncInputs();setMode('fit');recalculate();viewer?.setView('perspective');document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='perspective'));document.querySelectorAll('[data-preset]').forEach(b=>b.classList.toggle('selected',b.dataset.preset==='baseline'));toast('기본 파라미터로 초기화했습니다.');});
 $('export-btn').addEventListener('click',()=>{
@@ -262,5 +293,6 @@ syncInputs();
 try{viewer=createViewer($('viewer'),{corneaZ,lensZ,lensSag});}catch(error){console.error(error);$('viewer').textContent='이 브라우저에서 3D를 시작하지 못했습니다. 단면과 간격 지도를 확인해 주세요.';}
 recalculate();
 patientWorkspace=createPatientWorkspace({getParams:()=>params,getFit:()=>fit,toast,applyParams:next=>{const previous=params;params={...next};syncInputs();if(!recalculate()){params=previous;syncInputs();recalculate();return false;}clearPreset();return true;}});
-$('reset-btn').addEventListener('click',()=>patientWorkspace.resetMetadata());
+$('reset-btn').addEventListener('click',()=>{patientWorkspace.resetMetadata();if(model!=='advanced')patientWorkspace.update(params,sampleFit(params));});
+selectModel(model);
 window.addEventListener('pagehide',()=>{viewer?.dispose();resizeObserver.disconnect();patientWorkspace?.dispose();});
