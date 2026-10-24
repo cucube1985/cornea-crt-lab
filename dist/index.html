@@ -37,6 +37,7 @@
             <details class="advanced"><summary>각막 모델 가정 <span>＋</span></summary><div class="advanced-content"><label class="field slider-label" for="q"><span>비구면도 Q</span><div class="mini-number"><input id="q" type="number" min="-0.8" max="0" step="0.05" value="-0.25"></div></label><p>K로 측정한 값이 아닙니다. 기본 Q = −0.25, 각막 표시 직경 11.8 mm를 가정합니다.</p><p>축은 화면 오른쪽 0°에서 반시계방향으로 표시합니다. OD/OS 영상 방향은 별도 변환하지 않습니다.</p></div></details>
           </section>
           <section class="input-section" id="lens-section"><div class="section-heading"><span class="section-number blue">02</span><h3>CRT 렌즈 설계</h3><span class="section-badge">근사 모델</span></div>
+            <button class="recommend-open" id="recommend-btn" type="button"><span class="spark" aria-hidden="true">✧</span><span><strong>추천 렌즈 불러오기</strong><small>외부 CRT 계산기 결과를 모델에 적용</small></span><span aria-hidden="true">→</span></button>
             <label class="field slider-label" for="bc"><span>Base curve <span class="muted">BC</span></span><div class="mini-number"><input id="bc" type="number" min="7.5" max="10.5" step="0.1" value="8.6"><span>mm</span></div></label>
             <input aria-label="Base curve 슬라이더" class="slider" id="bc-range" type="range" min="7.5" max="10.5" step="0.1" value="8.6">
             <div class="range-labels"><span>7.5</span><span>10.5 mm</span></div>
@@ -81,6 +82,24 @@
     <footer class="page-footer"><span>CORNEA LAB <span class="footer-line">/</span> Educational geometry explorer</span><span>Paragon CRT® 구조를 참고한 비공식 근사 모델 <span class="footer-line">·</span><button id="footer-about">계산 방법 및 출처 ↗</button></span></footer>
   </main>
   <dialog id="about-dialog"><div class="dialog-heading"><div class="eyebrow">MODEL NOTES</div><button id="close-about" class="icon-button" aria-label="안내 닫기">×</button><h2>이 모델을 읽는 방법</h2><p>관찰 가능한 기하학과 실제 임상 피팅의 경계를 구분합니다.</p></div><div class="dialog-body"><h3>01 / 각막: K값을 표면으로</h3><p>각막계 굴절률 1.3375를 사용하는 관례적 환산식 <code>R(mm) = 337.5 / K(D)</code>으로 두 주경선 반경을 구합니다. 서로 직교하는 Flat/Steep 축을 비구면 표면에 적용합니다. Q = −0.25는 조절 가능한 가정값입니다. 표시 직경 11.8 mm는 고정입니다.</p><p>ARK의 K값과 축만으로는 주변부 높이, 비대칭, 국소 불규칙성, 후면, 두께를 알 수 없습니다. 실제 3D 재현에는 각막 지형도·단층촬영 또는 고도 데이터가 필요합니다. 렌즈 이동 시 표시 각막 밖 영역은 같은 수학 표면으로 외삽합니다.</p><h3>02 / CRT: 공개된 구조를 참고한 근사</h3><p>구면 중심부, S자형 Return zone, 직선 기울기의 Landing zone, 말단 들림을 갖는 회전대칭 후면을 표현합니다. 중심 광학부 직경 6 mm, Return 폭 1 mm를 고정하고 전체 직경 10.5 / 11.0 mm를 비교합니다. BC는 반경(mm), RZD는 깊이(µm), LZA는 각도의 절댓값(°)입니다.</p><p>Return zone 반경 3→4 mm에서 RZD만큼 깊어지는 5차 보간 곡선을 사용합니다. 말단 0.35 mm의 25 µm 들림은 별도 가정입니다. 제조사 CAD·가공 식을 복원한 모델이 아니며, 앞면과 렌즈 두께는 시각화 목적입니다. 입력 범위는 탐색용으로 실제 주문 가능 조합을 뜻하지 않습니다. 이 버전은 단일 축 렌즈 모델이며 Dual Axis 설계를 포함하지 않습니다.</p><h3>03 / 피팅: 정적 수직 간격</h3><p><code>gap = lens posterior z − corneal anterior z</code>입니다. 자동 안착은 유한 격자에서 최소 간격이 약 2 µm가 되도록 렌즈를 수직 이동시킵니다. 실제 착용 위치·안정성·최소거리·힘의 평형을 계산하지 않으며, 격자 사이 간섭을 놓칠 수 있습니다. 수동 모드의 꼭짓점 높이는 각막 꼭짓점 z=0을 기준으로 한 렌즈 꼭짓점 높이입니다. 기울기는 X/Y 방향의 평면 기울기로 근사하며 강체 회전은 아닙니다.</p><p>간격 &lt; 0은 수학적 표면 간섭입니다. 렌즈 침투나 조직 손상을 뜻하지 않습니다. 지도와 수치는 눈물층 유체역학·눈꺼풀 힘·각막 변형·야간 움직임·치료 후 변화를 계산하지 않으므로 실제 형광 패턴, 피팅 문제, 시력 개선을 예측하지 않습니다. 별도 임상 검증을 거치지 않았습니다.</p><h3>공식 참고 자료</h3><ul><li><a href="https://paragonvision.com/resources/fitting-guides-package-inserts/" target="_blank" rel="noopener noreferrer">Paragon Vision Sciences · Fitting guides & package inserts ↗</a></li><li><a href="https://www.accessdata.fda.gov/cdrh_docs/pdf5/P050031C.pdf" target="_blank" rel="noopener noreferrer">FDA · Paragon CRT 100 package insert ↗</a></li><li><a href="https://www.accessdata.fda.gov/cdrh_docs/pdf/P870024S043c.pdf" target="_blank" rel="noopener noreferrer">FDA · Professional fitting information ↗</a></li><li><a href="https://www.nidek.co.jp/wp-content/uploads/2024/02/ARK_1_AR_1_B01J005.pdf" target="_blank" rel="noopener noreferrer">NIDEK · ARK-1 keratometry specifications ↗</a></li></ul><p class="small-note">본 도구는 Paragon 또는 CooperVision의 공식 제품이 아닙니다. 실제 렌즈 선택과 피팅은 제조사 지침과 전문 검사를 따릅니다.</p></div></dialog>
+  <dialog id="recommend-dialog" aria-labelledby="recommend-title"><div class="dialog-heading"><div class="eyebrow">STARTING PARAMETERS</div><button id="close-recommend" class="icon-button" aria-label="추천 렌즈 닫기">×</button><h2 id="recommend-title">추천 렌즈 불러오기</h2><p>외부 CRT 계산기에서 받은 결과를 붙여넣거나 직접 입력해 모델에 적용합니다. CORNEA LAB은 추천 계산식을 포함하지 않으며, 입력값은 이 브라우저 안에서만 처리됩니다.</p></div>
+    <form class="dialog-body" id="recommend-form" novalidate>
+      <h3>01 / 계산기에서 결과 받기</h3>
+      <p class="recommend-step">계산기를 새 탭에서 열어 측정값을 입력하고, 결과 영역을 복사합니다.</p>
+      <div class="recommend-links" id="recommend-links"></div>
+      <h3>02 / 결과 붙여넣기</h3>
+      <textarea id="recommend-paste" class="recommend-paste" rows="4" spellcheck="false" placeholder="예) Toric: CRT(spherical) available&#10;OAD: 11.0&#10;BC: 8.3&#10;RZD1: 525&#10;LZA: 33"></textarea>
+      <p class="recommend-step" id="recommend-parsed" aria-live="polite">붙여넣으면 아래 칸이 자동으로 채워집니다.</p>
+      <h3>03 / 확인 후 적용</h3>
+      <div class="recommend-grid" id="recommend-fields"></div>
+      <div class="recommend-options"><div class="segmented" role="group" aria-label="추천 렌즈 직경"><button type="button" data-rec-diameter="10.5" class="active" aria-pressed="true">10.5 <span>mm</span></button><button type="button" data-rec-diameter="11" aria-pressed="false">11.0 <span>mm</span></button></div><label class="recommend-check"><input type="checkbox" id="rec-toric"><span>DA (toric) 권장 결과</span></label></div>
+      <p class="input-error" id="recommend-error" role="alert" hidden></p>
+      <div class="recommend-notes" id="recommend-notes" aria-live="polite"></div>
+      <div class="recommend-disclaimer"><strong>임상 판단 도구가 아닙니다</strong> 외부 계산기의 출력은 참고용 시작값이며, 실제 처방·피팅 적합도·교정 효과를 보장하지 않습니다. 렌즈 선택과 피팅은 제조사 지침, 지형도 검사, 시험 렌즈 평가와 전문가 판단을 따릅니다.</div>
+      <p class="small-note recommend-credit">외부 계산기의 결과와 정확성은 각 제공자에게 있습니다. CORNEA LAB은 VISUWORKS, Paragon, CooperVision과 관련이 없으며 공식 제품이 아닙니다.</p>
+      <div class="recommend-actions"><button class="button subtle" type="button" id="recommend-cancel">닫기</button><button class="button primary" type="submit" id="recommend-apply" disabled>모델에 적용</button></div>
+    </form>
+  </dialog>
   <div id="toast" class="toast" role="status" hidden></div>
   <script type="module" src="./app.js"></script>
 </body>

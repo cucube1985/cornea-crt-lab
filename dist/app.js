@@ -1,5 +1,6 @@
 import {defaultParams,modelAssumptions,normalizeParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js';
 import {createViewer} from './renderer.js';
+import {calculatorLinks,resultFields,parseCalculatorText} from './recommend.js';
 
 const $=id=>document.getElementById(id);
 const BASE={...defaultParams,flatK:42.5,steepK:44,clearance:.020};
@@ -178,6 +179,74 @@ $('export-btn').addEventListener('click',()=>{
   clearTimeout(updateTimer);recalculate();
   const record={application:'CORNEA LAB',version:'1.0',createdAt:new Date().toISOString(),purpose:'Educational static geometry only; not a clinical fitting or treatment prediction',input:params,effectivePosition:{clearanceMm:fit.clearance,autoSeated:fit.autoSeated},metrics:fit.metrics,metricUnits:{gapAndElevation:'micrometres',locationAndRadius:'millimetres',fractions:'0 to 1'},assumptions:modelAssumptions,sources:sourceLinks};
   const url=URL.createObjectURL(new Blob([JSON.stringify(record,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='cornea-lab-settings.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('설정과 계산값을 JSON 파일로 저장했습니다.');
+});
+// Recommended starting lens: results come from an external calculator and are applied on request.
+let recDiameter=10.5,recApply=null;
+const recInput=key=>$('rec-'+key);
+const recLimits={flatK:[35,55,.25],steepK:[35,55,.25],q:[-.8,0,.05],bc:[7.5,10.5,.1],rzd:[400,700,25],lza:[25,45,1]};
+function fitLimit(key,value){const [low,high,step]=recLimits[key];const v=Number(Math.max(low,Math.min(high,Math.round(value/step)*step)).toFixed(5));return{value:Object.is(v,-0)?0:v,clamped:value<low-1e-9||value>high+1e-9};}
+const signed=n=>format(n,2).replace('-','−');
+$('recommend-fields').replaceChildren(...resultFields.map(field=>{
+  const label=document.createElement('label');label.className='field';label.textContent=field.label;
+  const wrap=document.createElement('div');wrap.className='number-wrap';
+  const input=document.createElement('input');Object.assign(input,{id:'rec-'+field.key,type:'number',step:field.step,inputMode:'decimal'});
+  const unit=document.createElement('span');unit.textContent=field.unit;
+  wrap.append(input,unit);label.append(wrap);return label;
+}));
+$('recommend-links').replaceChildren(...calculatorLinks.map(link=>{const a=document.createElement('a');a.className='button subtle recommend-link';a.href=link.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=link.name+' ↗';return a;}));
+function setRecDiameter(value){recDiameter=value;document.querySelectorAll('[data-rec-diameter]').forEach(b=>{const active=Number(b.dataset.recDiameter)===value;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});}
+function updateRecommendation(){
+  const values={},errors=[];
+  for(const field of resultFields){
+    const input=recInput(field.key),raw=input.value.trim(),v=Number(raw),bounded=['k1','k2','ecc'].includes(field.key);
+    let ok=raw===''?!!field.optional:Number.isFinite(v);
+    if(ok&&raw!==''&&bounded)ok=v>=field.min&&v<=field.max;
+    input.setAttribute('aria-invalid',String(!ok));
+    if(!ok)errors.push(bounded?`${field.label} (${field.min}–${field.max})`:field.label);
+    else if(raw!=='')values[field.key]=v;
+  }
+  let message=errors.length?`입력을 확인해 주세요: ${errors.join(', ')}`:'';
+  if(!message&&values.k1>values.k2)message='K1(Flat)을 K2(Steep) 이하로 입력해 주세요.';
+  $('recommend-error').textContent=message;$('recommend-error').hidden=!message;
+  recApply=null;$('recommend-apply').disabled=!!message;
+  if(message){$('recommend-notes').replaceChildren();return;}
+  const lens={bc:fitLimit('bc',values.bc),rzd:fitLimit('rzd',values.rzd1),lza:fitLimit('lza',values.lza)};
+  const q=values.ecc===undefined?null:fitLimit('q',-(values.ecc**2)).value;
+  recApply={flatK:fitLimit('flatK',values.k1).value,steepK:fitLimit('steepK',values.k2).value,bc:lens.bc.value,rzd:lens.rzd.value,lza:lens.lza.value,diameter:recDiameter,...(q===null?{}:{q})};
+  const notes=[];
+  if($('rec-toric').checked)notes.push(`DA 렌즈 결과지만 CORNEA LAB은 단일 축 렌즈만 표현하므로 RZD1만 적용합니다${values.rzd2!==undefined?` (RZD2 ${values.rzd2} µm 미적용)`:''}.`);
+  const outside=Object.entries(lens).filter(([,v])=>v.clamped).map(([k])=>k.toUpperCase());
+  if(outside.length)notes.push(`${outside.join(', ')} 값이 모델 표시 범위를 벗어나 가장 가까운 값으로 적용됩니다.`);
+  notes.push(q===null?`Ecc를 비워 두면 비구면도 Q는 현재 값(${signed(params.q)})을 유지합니다.`:`Ecc ${format(values.ecc,2)}는 비구면도 Q = −Ecc² ≈ ${signed(q)}로 적용됩니다.`);
+  notes.push('렌즈 위치는 중앙·자동 안착으로 초기화됩니다.');
+  $('recommend-notes').replaceChildren(...notes.map(text=>{const p=document.createElement('p');p.textContent=text;return p;}));
+}
+const pasteHint='붙여넣으면 아래 칸이 자동으로 채워집니다.';
+$('recommend-paste').addEventListener('input',()=>{
+  const text=$('recommend-paste').value,found=parseCalculatorText(text);
+  const keys=resultFields.map(f=>f.key).filter(key=>found[key]!==undefined);
+  keys.forEach(key=>recInput(key).value=found[key]);
+  if(found.oad!==undefined)setRecDiameter(found.oad);
+  if(found.toric!==undefined)$('rec-toric').checked=found.toric;
+  const names=[...keys.map(k=>resultFields.find(f=>f.key===k).label),...(found.oad!==undefined?['OAD']:[]),...(found.toric!==undefined?['렌즈 종류']:[])];
+  $('recommend-parsed').textContent=text.trim()===''?pasteHint:names.length?`인식한 값: ${names.join(', ')}`:'인식한 값이 없습니다. 아래 칸에 직접 입력해 주세요.';
+  updateRecommendation();
+});
+$('recommend-fields').addEventListener('input',updateRecommendation);
+$('rec-toric').addEventListener('change',updateRecommendation);
+document.querySelectorAll('[data-rec-diameter]').forEach(button=>button.addEventListener('click',()=>{setRecDiameter(Number(button.dataset.recDiameter));updateRecommendation();}));
+$('recommend-btn').addEventListener('click',()=>{
+  const current={k1:params.flatK,k2:params.steepK,ecc:'',bc:params.bc,rzd1:params.rzd,rzd2:'',lza:params.lza};
+  for(const key in current)recInput(key).value=current[key];
+  $('recommend-paste').value='';$('recommend-parsed').textContent=pasteHint;$('rec-toric').checked=false;setRecDiameter(params.diameter);
+  updateRecommendation();$('recommend-dialog').showModal();
+});
+for(const id of ['close-recommend','recommend-cancel'])$(id).addEventListener('click',()=>$('recommend-dialog').close());
+$('recommend-form').addEventListener('submit',event=>{
+  event.preventDefault();updateRecommendation();if(!recApply)return;
+  params={...params,...recApply,offsetX:0,offsetY:0,tiltX:0,tiltY:0,autoSeat:true};
+  clearPreset();syncInputs();setMode('fit');recalculate();$('recommend-dialog').close();
+  toast(`추천값을 적용했습니다 · BC ${params.bc.toFixed(1)} / RZD ${params.rzd} / LZA ${params.lza}° / ${params.diameter.toFixed(1)} mm`);
 });
 for(const id of ['about-btn','notice-more','footer-about'])$(id).addEventListener('click',()=>$('about-dialog').showModal());
 $('close-about').addEventListener('click',()=>$('about-dialog').close());

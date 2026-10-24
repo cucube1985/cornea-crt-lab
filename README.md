@@ -37,6 +37,10 @@ Node.js가 설치된 상태에서 이 디렉터리에서 `npm start` 실행 후 
 - Flat/Steep 주경선 단면, 수직 간격 지도, 설명 가능한 기하 지표
 - 기본/난시/이동/기울기/간섭 시나리오, 브라우저 내 설정 보관, JSON 내보내기
 
+## 추천 렌즈 불러오기
+
+CRT 렌즈 설계 패널의 **추천 렌즈 불러오기**는 외부 CRT 계산기(예: [VISUWORKS CRT Parameter Calculator](https://visuworks-dev.github.io/ParagonCRT-Calculator/))에서 받은 결과를 모델에 옮기는 기능입니다. 계산기 링크를 새 탭으로 열어 결과를 복사해 붙여넣으면 `dist/recommend.js`가 BC, RZD1, RZD2, LZA, OAD, K1/K2, Ecc와 DA 권장 여부를 인식해 입력칸을 채웁니다. 직접 입력해도 됩니다. 적용 시 BC·RZD1·LZA·OAD·K값과 (Ecc 입력 시) Q = −Ecc²를 모델에 채우며, 단일 축 모델이므로 RZD2는 적용하지 않습니다. CORNEA LAB은 추천 계산식을 포함하지 않으며 외부 계산기 제공자와 관련이 없습니다. 출력은 참고용 시작값이며 임상 처방이나 피팅 결과를 보장하지 않습니다.
+
 ## 모델과 단위
 
 `geometry.js`는 mm 좌표계를 사용합니다. +x는 화면 오른쪽, +y는 위쪽, +z는 전방이고 각막 꼭짓점은 z=0입니다. Steep axis는 +x에서 반시계방향이며 Flat axis는 90° 직교한다고 가정합니다. 반경은 각막계 굴절률 1.3375의 관례에 따른 `337.5/K`입니다. 표시 각막 직경 11.8 mm는 고정이며 Q는 기본 -0.25입니다.

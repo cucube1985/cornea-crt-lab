@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { corneaZ, lensSag, lensZ, sampleFit, normalizeParams, defaultParams } from './dist/geometry.js';
+import { parseCalculatorText } from './dist/recommend.js';
 
 const near = (a, b, tolerance, label) => assert.ok(Math.abs(a - b) <= tolerance, `${label}: ${a} vs ${b}`);
 const p = { ...defaultParams };
@@ -64,4 +65,15 @@ for (const diameter of [10.5, 11]) {
   assert.ok(Number.isFinite(result.metrics.returnGap) && Number.isFinite(result.metrics.edgeGap));
 }
 
-console.log('Geometry checks passed: analytic cornea, axes, zone continuity, units, diameter, pose, seating, and gap metrics.');
+// Pasted calculator output is parsed into lens parameters; DA wording sets the toric flag.
+{
+  const da = parseCalculatorText('Toric: CRT DA(toric) recommended\nOAD: 10.5\nBC: 8.6\nRZD1: 525\nRZD2: 550\nLZA: 33\nLensSag@8mm: 1071');
+  assert.deepEqual(da, { bc: 8.6, rzd1: 525, rzd2: 550, lza: 33, oad: 10.5, toric: true });
+  const sph = parseCalculatorText('Toric: CRT(spherical) available\nOAD: 11.0\nBC: 8.3\nRZD1: 525\nRZD2: 525\nLZA: 33');
+  assert.deepEqual(sph, { bc: 8.3, rzd1: 525, rzd2: 525, lza: 33, oad: 11, toric: false });
+  const loose = parseCalculatorText('BC 8.4 RZD 550 LZA 34 K1 42.75 K2 44 Ecc 0.5 Flat Ecc 0.4');
+  assert.deepEqual(loose, { k1: 42.75, k2: 44, ecc: 0.5, bc: 8.4, rzd1: 550, lza: 34 });
+  assert.deepEqual(parseCalculatorText('no numbers here'), {});
+}
+
+console.log('Geometry checks passed: analytic cornea, axes, zone continuity, units, diameter, pose, seating, gap metrics, and calculator paste parsing.');
