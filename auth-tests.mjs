@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {openAuthStore} from './auth/store.mjs';
-import {createAuthenticatedServer,validateOrigin} from './auth/http.mjs';
+import {createAuthenticatedServer,validateOrigin,originFromEnvironment} from './auth/http.mjs';
 
 const temp=await mkdtemp(path.join(tmpdir(),'cornea-auth-test-')),filename=path.join(temp,'auth.sqlite');
 const seed='Test-only-admin-password-42',memberPassword='Test-only-member-password-42',changed='Test-only-new-password-84';
@@ -13,6 +13,10 @@ const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const close=server=>server?new Promise(resolve=>server.close(resolve)):Promise.resolve();
 try{
   assert.throws(()=>validateOrigin('http://example.com'));assert.throws(()=>validateOrigin('https://example.com/path'));
+  assert.equal(originFromEnvironment({NODE_ENV:'production',RENDER_EXTERNAL_URL:'https://cornea-test.onrender.com/'},10000),'https://cornea-test.onrender.com');
+  assert.equal(originFromEnvironment({NODE_ENV:'production',PUBLIC_ORIGIN:'https://custom.example',RENDER_EXTERNAL_URL:'https://cornea-test.onrender.com'},10000),'https://custom.example');
+  assert.throws(()=>originFromEnvironment({NODE_ENV:'production'},10000));
+  assert.throws(()=>originFromEnvironment({NODE_ENV:'production',RENDER_EXTERNAL_URL:'http://cornea-test.onrender.com'},10000));
   await assert.rejects(()=>openAuthStore({filename:path.join(temp,'missing.sqlite')}),/관리자 계정/);
   store=await openAuthStore({filename,initialPassword:seed,now:()=>clock});
   server=await createAuthenticatedServer({store,root:fileURLToPath(new URL('./dist/',import.meta.url)),origin});await listen(server);

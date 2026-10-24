@@ -12,6 +12,11 @@ export function validateOrigin(value){
   if(url.protocol!=='https:'&&!(url.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(url.hostname)))throw new Error('PUBLIC_ORIGIN must use HTTPS except on loopback.');
   return url;
 }
+export function originFromEnvironment(env,port){
+  const origin=env.PUBLIC_ORIGIN||env.RENDER_EXTERNAL_URL?.replace(/\/$/,'')||(env.NODE_ENV==='production'?null:`http://127.0.0.1:${port}`);
+  if(!origin)throw new Error('Production requires PUBLIC_ORIGIN or Render\'s RENDER_EXTERNAL_URL.');
+  validateOrigin(origin);return origin;
+}
 async function jsonBody(req){
   if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')throw new AccessError(415,'JSON 요청만 지원합니다.');
   let bytes=0;const chunks=[];
