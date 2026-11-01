@@ -1,43 +1,21 @@
-# CORNEA LAB · 이 노트북 전용
+# CORNEA LAB
 
-각막 / CRT 렌즈 교육용 3D 기하 탐색기입니다. **이 노트북에서만** 로그인하고 사용하도록 구성했습니다. 유료 호스팅이나 외부 인증 서버는 필요하지 않습니다.
+각막 / CRT 렌즈 교육용 3D 기하 탐색기입니다. 로그인 없이 누구나 웹에서 사용할 수 있는 정적 웹 앱입니다.
 
-## 시작과 종료
+## 온라인
 
-1. 이 폴더의 **앱 시작.cmd**를 더블클릭합니다. 서버가 백그라운드에서 실행되고 기본 브라우저에 로그인 화면이 열립니다.
-2. 주소는 **http://127.0.0.1:4173/** 입니다. 초기 설정한 `admin` 계정으로 로그인합니다. 비밀번호는 공개 소스에 포함하지 않습니다.
-3. 상단 **설정**에서 계정 추가, 활성/비활성 상태, 내 비밀번호 변경을 사용할 수 있습니다.
-4. 마칠 때 **앱 종료.cmd**를 실행합니다. 브라우저 창을 닫는 것만으로는 서버가 종료되지 않습니다.
+https://cucube1985.github.io/cornea-crt-lab/
 
-노트북 종료·재부팅 시 서버도 종료됩니다. 다시 사용할 때 시작 파일을 실행합니다. 절전 중에는 이용할 수 없으며, 절전 복귀 후 세션이 만료됐다면 다시 로그인합니다. OS 자동 실행은 등록하지 않습니다. 시작 파일을 반복 실행해도 서버를 중복 실행하지 않습니다.
-
-## 이 노트북에만 접속 허용
-
-서버 주소와 로그인 origin은 `127.0.0.1:4173`으로 고정됩니다. 환경 변수로 LAN/외부 접속을 켜지 않으며, 같은 와이파이의 다른 PC·휴대폰에서도 이 서버에 접속할 수 없습니다. 방화벽 포트 개방, 공유기 변경, 외부 터널은 만들지 않습니다.
-
-계정과 비밀번호 해시, 세션은 `.private/accounts.sqlite`에 보관됩니다. 서버를 껐다 켜도 유지되며 GitHub에는 업로드하지 않습니다. 종료 파일은 비공개 제어 토큰과 실행 식별자를 확인해 해당 앱만 정상 종료합니다.
-
-## GitHub와 사이트
-
-- [GitHub 저장소](https://github.com/cucube1985/cornea-crt-lab): 소스와 변경 기록
-- [GitHub Pages](https://cucube1985.github.io/cornea-crt-lab/): 사용 안내와 로컬 앱 열기 링크
-
-Pages에는 모델 앱 파일이나 로그인 API, 계정 DB를 게시하지 않습니다. 실제 앱과 로그인은 이 노트북의 서버가 제공합니다. 공개 소스의 열람·복제를 막는 기능은 아닙니다.
+모든 계산과 측정값 처리는 각자의 브라우저 안에서만 이루어지며, 서버나 GitHub로 전송되지 않습니다. 환자 비교 설정을 "이 기기에 보관"하면 그 브라우저의 저장 공간에만 남으므로 공용 기기에서는 보관하지 말고, 이름·차트번호 대신 별칭을 사용합니다.
 
 ## 실행과 개발
 
 ```powershell
-# Node 24에서 이 저장소 폴더를 사용
-npm run local:start
-npm run local:stop
-# 직접 실행하고 Ctrl+C로 종료할 수도 있습니다
-npm start
+npm start   # http://127.0.0.1:4173
 npm test
 ```
 
-Node.js 24가 필요하며 이 노트북에는 설치되어 있습니다. 새로 복제한 환경에서는 초기 관리자 비밀번호를 stdin으로 전달해 `npm run init-admin -- --password-stdin`으로 초기화합니다. 기존 관리자 계정은 덮어쓰지 않습니다.
-
-기하·계산기·환자 비교·로그인·권한·세션·로컬 종료 인증 테스트를 통과한 뒤 GitHub에 소스를 올립니다. `main` 푸시 시 GitHub Actions는 테스트 후 `scripts/build-pages.mjs`로 만든 `pages/` 안내 화면만 게시합니다. OpenAI Sites와 유료 서버 배포 설정은 사용하지 않습니다. [로컬 로그인 안내](docs/server-login.md)를 확인하세요.
+`main`에 푸시하면 GitHub Actions가 테스트 후 `dist/`를 GitHub Pages에 게시합니다. ES module과 WebGL을 사용하므로 HTML 파일을 직접 여는 대신 HTTP로 실행합니다.
 
 빌드 과정 없이 Node 24와 정적 ES module/WebGL을 사용합니다. Three.js 0.170.0은 로컬 vendor에 포함하고 MIT 라이선스를 동봉했습니다. 폰트는 Google Fonts에서 로드하며 오프라인에서는 시스템 폰트로 표시합니다.
 
@@ -70,9 +48,9 @@ Node.js 24가 필요하며 이 노트북에는 설치되어 있습니다. 새로
 
 자료는 기본적으로 메모리에만 있으며, 사용자가 직접 선택하면 이 기기에 보관하거나 JSON으로 저장하고 불러올 수 있습니다. 측정값을 서버나 GitHub에 전송하는 기능은 없습니다. 비교표 인쇄도 지원합니다. 정의·좌표·BFS 입력 조건과 가상 예시는 [환자 비교 안내](docs/patient-comparison.md)를 확인하세요.
 
-## 추천 렌즈 불러오기
+## 외부 계산 결과 불러오기
 
-CRT 렌즈 설계 패널의 **추천 렌즈 불러오기**는 외부 CRT 계산기(예: [VISUWORKS CRT Parameter Calculator](https://visuworks-dev.github.io/ParagonCRT-Calculator/))에서 받은 결과를 모델에 옮기는 기능입니다. 계산기 링크를 새 탭으로 열어 결과를 복사해 붙여넣으면 `dist/recommend.js`가 BC, RZD1, RZD2, LZA, OAD, K1/K2, Ecc와 DA 권장 여부를 인식해 입력칸을 채웁니다. 직접 입력해도 됩니다. 적용 시 BC·RZD1·LZA·OAD·K값과 (Ecc 입력 시) Q = −Ecc²를 모델에 채우며, 단일 축 모델이므로 RZD2는 적용하지 않습니다. CORNEA LAB은 추천 계산식을 포함하지 않으며 외부 계산기 제공자와 관련이 없습니다. 출력은 참고용 시작값이며 임상 처방이나 피팅 결과를 보장하지 않습니다.
+CRT 렌즈 설계 패널의 **외부 계산 결과 불러오기**는 외부 CRT 계산기(예: [VISUWORKS CRT Parameter Calculator](https://visuworks-dev.github.io/ParagonCRT-Calculator/))에서 받은 결과를 모델에 옮기는 기능입니다. 계산기 링크를 새 탭으로 열어 결과를 복사해 붙여넣으면 `dist/recommend.js`가 BC, RZD1, RZD2, LZA, OAD, K1/K2, Ecc와 DA 권장 여부를 인식해 입력칸을 채웁니다. 직접 입력해도 됩니다. 적용 시 BC·RZD1·LZA·OAD·K값과 (Ecc 입력 시) Q = −Ecc²를 모델에 채우며, 단일 축 모델이므로 RZD2는 적용하지 않습니다. CORNEA LAB은 추천 계산식을 포함하지 않으며 외부 계산기 제공자와 관련이 없습니다. 출력은 참고용 시작값이며 임상 처방이나 피팅 결과를 보장하지 않습니다.
 
 ## 모델과 단위
 
@@ -95,4 +73,8 @@ CRT 렌즈 설계 패널의 **추천 렌즈 불러오기**는 외부 CRT 계산�
 - [FDA CRT 100 Package Insert](https://www.accessdata.fda.gov/cdrh_docs/pdf5/P050031C.pdf)
 - [NIDEK ARK-1 사양](https://www.nidek.co.jp/wp-content/uploads/2024/02/ARK_1_AR_1_B01J005.pdf)
 
-Paragon/CooperVision의 공식 제품이 아닙니다. 모든 표시는 정적 교육 모델의 출력입니다.
+## 고지
+
+- 교육·설명용 기하 시각화이며 의료기기가 아닙니다. 진단·처방·렌즈 선택에 사용하지 않습니다. 모든 표시는 정적 교육 모델의 출력입니다.
+- Paragon CRT®는 해당 권리자의 등록상표입니다. CORNEA LAB은 Paragon Vision Sciences, CooperVision, VISUWORKS와 관련이 없는 비공식 도구입니다.
+- Three.js(MIT, `dist/vendor/THREE-LICENSE.txt`)와 Google Fonts(OFL)를 사용합니다. 참고 문헌과 공식 자료는 링크로만 인용합니다.

@@ -1,4 +1,4 @@
-import {defaultParams} from './geometry.js?v=5';
+import {defaultParams} from './geometry.js?v=6';
 
 // Select a calculation model without overwriting the user's Advanced inputs.
 export const modelModes = Object.freeze({

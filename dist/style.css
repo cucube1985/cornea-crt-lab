@@ -40,3 +40,5 @@
 .recommend-options .segmented{min-width:180px}
 .recommend-check{display:flex;align-items:center;gap:7px;font-size:11px;color:#637581}
 @media(max-width:730px){.recommend-grid{grid-template-columns:repeat(2,1fr)}}
+
+.page-footer{flex-wrap:wrap}.footer-legal{flex-basis:100%;font-size:9px;line-height:1.7;color:#a3afb6;word-break:keep-all}
