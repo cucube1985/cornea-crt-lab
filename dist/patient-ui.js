@@ -1,5 +1,7 @@
-import {defaultParams,sampleFit} from './geometry.js?v=6';
-import {emptyMetadata,sourceNames,sanitizeRecord,elevationToSag,parseSession,makeSession} from './patient-data.js?v=6';
+import {defaultParams,sampleFit} from './geometry.js?v=7';
+import {emptyMetadata,sourceNames,sanitizeRecord,elevationToSag,parseSession,makeSession} from './patient-data.js?v=7';
+import {sanitizeRetention,sanitizeOutcome,outcomeKModels} from './fitting-effects.js?v=7';
+import {createOutcomePanel} from './outcome-ui.js?v=7';
 
 const $=id=>document.getElementById(id);
 const fmt=(n,d=1)=>typeof n==='number'&&Number.isFinite(n)?n.toFixed(d):'—';
@@ -8,8 +10,8 @@ const number=(id,label,unit,min,max,step,value='',optional=false)=>`<label class
 const sources=group=>`<label class="source-select">값의 출처 <select id="pt-source-${group}" aria-label="${{size:'각막 크기',q:'비구면도',rings:'주변부 높이',asym:'비대칭',pupil:'동공'}[group]} 출처">${Object.entries(sourceNames).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>`;
 const heading=(n,title,group)=>`<div class="patient-group-title"><span>${n}</span><h3>${title}</h3>${sources(group)}</div>`;
 
-export function createPatientWorkspace({getParams,getFit,applyParams,toast}){
-  let meta=emptyMetadata(),cases={A:null,B:null},snapshots={A:null,B:null},activeMeridian='flat';
+export function createPatientWorkspace({getParams,getFit,applyParams,toast,onRetentionChanged=()=>{}}){
+  let meta=emptyMetadata(),cases={A:null,B:null},snapshots={A:null,B:null},activeMeridian='flat',outcomePanel,retentionKey='';
   const storage='cornea-lab-patient-v2',consent='cornea-lab-patient-optin';
   let keep=false;
   try{keep=localStorage.getItem(consent)==='true';}catch{}
@@ -41,7 +43,7 @@ export function createPatientWorkspace({getParams,getFit,applyParams,toast}){
   function download(data,name){const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   function persist(){if(!keep)return;try{localStorage.setItem(storage,JSON.stringify(makeSession(currentRecord(),cases)));}catch{toast('이 기기에 저장하지 못했습니다. JSON으로 저장해 주세요.');}}
   function exportSession(){download(makeSession(currentRecord(),cases),'cornea-lab-comparison.json');toast('현재 조건과 A/B를 JSON으로 저장했습니다.');}
-  function sourceSummary(record){const values=Object.values(record.meta.sources),measured=values.filter(v=>v==='measured').length;return measured?`측정값 포함 항목군 ${measured}/5 · 부분 실측 기반 근사`:values.includes('entered')?'수기 입력 포함 · 근사 표면':'가정 기반 근사';}
+  function sourceSummary(record){const values=Object.values(record.meta.sources),measured=values.filter(v=>v==='measured').length;const label=measured?`측정값 포함 항목군 ${measured}/5 · 부분 실측 기반 근사`:values.includes('entered')?'수기 입력 포함 · 근사 표면':'가정 기반 근사';return label+(record.meta.kOnlyPreview?' · 전후 K 요약 기반 · 주변부 형태 가정':'');}
   function ringKind(){const bfs=input('ring-kind').value==='bfs';$('patient-bfs-fields').hidden=!bfs;dialog.querySelector('.bfs-note').hidden=!bfs;input('bfsRadius').disabled=!bfs;input('apexElevation').disabled=!bfs;ringKeys.forEach(key=>{input(key).min=bfs?-1000:100;input(key).max=bfs?1000:key.includes('10')?6000:5000;});}
   function fillForm(){
     const p=getParams();input('label').value=meta.label;input('eye').value=p.eye;input('axl').value=meta.axl??'';input('q-range').value=meta.qRange;input('q-mode').value=meta.qMode;
@@ -63,7 +65,7 @@ export function createPatientWorkspace({getParams,getFit,applyParams,toast}){
     event.preventDefault();
     try{
       const form=$('patient-form');if(!form.checkValidity()){const bad=[...form.querySelectorAll('input')].find(el=>!el.validity.valid);bad?.focus();throw new Error('숫자의 범위와 단위를 확인해 주세요.');}
-      const next={...getParams()},m=clone(meta);m.label=input('label').value.trim()||'비교 자료';m.axl=input('axl').value===''?null:Number(input('axl').value);m.qMode=input('q-mode').value;m.qRange=input('q-range').value;
+      const next={...getParams()},m=clone(meta);m.kOnlyPreview=false;m.label=input('label').value.trim()||'비교 자료';m.axl=input('axl').value===''?null:Number(input('axl').value);m.qMode=input('q-mode').value;m.qRange=input('q-range').value;
       numericKeys.forEach(key=>next[key]=input(key).value===''?null:Number(input(key).value));
       m.vvidMeasured=input('vvid').value!=='';if(!m.vvidMeasured)next.vvid=next.hvid;
       if(m.qMode==='e'){next.qFlat=-(next.qFlat**2);next.qSteep=-(next.qSteep**2);}
@@ -107,7 +109,8 @@ export function createPatientWorkspace({getParams,getFit,applyParams,toast}){
     $('pt-summary-asym').textContent=`${fmt(a.asymNT,0)} / ${fmt(a.asymSI,0)} µm`;
     $('pt-summary-pupil').textContent=`Ø${fmt(a.pupilDiameter)} · 중심 ${fmt(a.pupilToVertex,2)} mm`;
     $('patient-source-summary').textContent=sourceSummary({meta});
-    $('patient-kind').value=meta.kind;persist();
+    $('patient-kind').value=meta.kind;outcomePanel?.update(meta.outcome,p);persist();
+    const key=JSON.stringify(meta.retention);if(key!==retentionKey){retentionKey=key;onRetentionChanged();}
   }
 
   function canvasSetup(id){const canvas=$(id),rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),w=Math.max(1,rect.width),h=Math.max(1,rect.height);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);return{ctx,w,h};}
@@ -142,5 +145,20 @@ export function createPatientWorkspace({getParams,getFit,applyParams,toast}){
   const resize=new ResizeObserver(()=>{drawFront('A');drawFront('B');drawComparisonProfile();});for(const id of ['slot-A-canvas','slot-B-canvas','comparison-profile-canvas'])resize.observe($(id).parentElement);
   if(keep){try{const raw=localStorage.getItem(storage);if(raw){const session=parseSession(raw);const a=makeSnapshot(session.cases.A),b=makeSnapshot(session.cases.B);if(applyParams(session.current.input)){meta=session.current.meta;cases=session.cases;snapshots={A:a,B:b};}}}catch{toast('보관된 비교 설정을 읽지 못했습니다. 기본값을 표시합니다.');}}
   renderComparison();update(getParams(),getFit());
-  return{update,exportSession,markCommonQ(){meta.sources.q='entered';meta.qMode='q';},resetMetadata(){meta=emptyMetadata();update(getParams(),getFit());},dispose(){resize.disconnect();}};
+  outcomePanel=createOutcomePanel({getData:()=>meta.outcome,getParams,onSave:data=>{meta.outcome=sanitizeOutcome(data);update(getParams(),getFit());toast('착용 전후 실측 비교를 적용했습니다.');},onBuildModels:()=>{
+    try{
+      const pair=outcomeKModels(meta.outcome,getParams()),records={};
+      for(const[slot,phase]of [['A','before'],['B','after']]){
+        const m=clone(meta);m.label=(meta.label.slice(0,24)+(slot==='A'?' · 착용 전 K 근사':' · 착용 후 K 근사')).slice(0,40);m.kind='time';m.kOnlyPreview=true;m.qMode='q';m.qRange='가정 Q=-0.25';m.ringForm={kind:'sag',bfsRadius:null,apexElevation:null};
+        for(const group of ['q','rings','asym'])m.sources[group]='assumed';
+        m.treatmentSource=pair[phase].treatmentDiameter!==null?'measured':'assumed';records[slot]=sanitizeRecord({input:pair[phase],meta:m});
+      }
+      meta.kind='time';setCases(records);update(getParams(),getFit());toast('A/B를 전후 K 기반 근사 모델로 교체했습니다.');
+    }catch(error){toast(error.message);}
+  },onApplyZone:()=>{
+    const d=meta.outcome;if(d.eye!==getParams().eye||[d.zoneDiameter,d.zoneX,d.zoneY].some(v=>v===null))return;
+    if(applyParams({...getParams(),treatmentDiameter:d.zoneDiameter,treatmentX:d.zoneX,treatmentY:d.zoneY})){meta.treatmentSource='measured';update(getParams(),getFit());toast('측정한 치료 영역을 현재 3D에 표시했습니다.');}
+  }});
+  outcomePanel.update(meta.outcome,getParams());
+  return{update,exportSession,getRetention:()=>({...meta.retention}),setRetention:settings=>{meta.retention=sanitizeRetention(settings);persist();},markCommonQ(){meta.sources.q='entered';meta.qMode='q';meta.kOnlyPreview=false;},resetMetadata(){meta=emptyMetadata();update(getParams(),getFit());},dispose(){resize.disconnect();outcomePanel.dispose();}};
 }

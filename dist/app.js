@@ -1,15 +1,21 @@
-import {defaultParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js?v=6';
-import {createViewer} from './renderer.js?v=6';
+import {defaultParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js?v=7';
+import {createViewer} from './renderer.js?v=7';
 import {calculatorLinks,resultFields,parseCalculatorText} from './recommend.js';
-import {createPatientWorkspace} from './patient-ui.js?v=6';
-import {modelModes,modelParameters} from './model-modes.js?v=6';
+import {createPatientWorkspace} from './patient-ui.js?v=7';
+import {modelModes,modelParameters} from './model-modes.js?v=7';
+import {retentionDefaults,capillaryLineForce} from './fitting-effects.js?v=7';
+import {createRetentionPanel} from './retention-ui.js?v=7';
 
 const $=id=>document.getElementById(id);
 const BASE={...defaultParams,flatK:42.5,steepK:44,clearance:.020};
 const numberKeys=['flatK','steepK','steepAxis','q','bc','rzd','lza','offsetX','offsetY','tiltX','tiltY','clearance'];
-let params={...BASE},fit,model='advanced',mode='fit',meridian='flat',viewer,updateTimer,toastTimer,patientWorkspace;
+let params={...BASE},fit,model='advanced',mode='fit',meridian='flat',viewer,updateTimer,toastTimer,patientWorkspace,retentionPanel;
 const options={mode,scale:1,exploded:false,wireframe:false,showClearance:false,showAxes:true,showPupil:true};
-const viewOptions=()=>({...options,showPupil:model==='advanced'&&options.showPupil,showClearance:mode==='fit'&&options.showClearance,exploded:mode==='fit'&&options.exploded});
+const viewOptions=()=>{
+  const settings=patientWorkspace?.getRetention()??retentionDefaults;
+  const show=mode==='fit'&&settings.show&&fit?.metrics.penetrationFraction<=.0001&&fit.metrics.coverageFraction>=.999;
+  return {...options,showPupil:model==='advanced'&&options.showPupil,showClearance:mode==='fit'&&options.showClearance,exploded:mode==='fit'&&options.exploded,retention:show?capillaryLineForce(fit.params.diameter,settings):null};
+};
 function updateViewer(){if(fit)viewer?.update(fit.params,fit,viewOptions());}
 
 // Patient inputs stay in memory unless the comparison panel's device-storage option is enabled.
@@ -43,6 +49,7 @@ function recalculate(){
 }
 function updateReadout(){
   const p=fit.params,m=fit.metrics;
+  retentionPanel?.update(p,fit);
   updateSceneLegend();
   $('flat-radius').textContent=format(fit.radii.flat,2);$('steep-radius').textContent=format(fit.radii.steep,2);
   $('flat-axis').textContent=format(p.flatAxis)+'°';$('astig-value').textContent=format(p.steepK-p.flatK,2);
@@ -66,6 +73,7 @@ function updateSceneLegend(){
   const spans=document.querySelectorAll('.scene-legend>span');spans[0].hidden=mode==='lens';spans[1].hidden=mode==='cornea';
   $('pupil-legend').hidden=!viewOptions().showPupil||mode==='lens';
   $('treatment-legend').hidden=!viewOptions().showPupil||mode==='lens'||fit.params.treatmentDiameter===null;
+  $('retention-legend').hidden=!(viewOptions().retention?.axialMn>0);
 }
 
 // A single distance palette is used in the 2D map and the 3D surface overlay.
@@ -141,7 +149,9 @@ function updateModelPanels(){
   const advanced=model==='advanced',fitting=mode==='fit';
   document.body.dataset.model=model;
   const hide=(selector,hidden)=>document.querySelectorAll(selector).forEach(el=>el.hidden=hidden);
-  hide('#patient-summary,#patient-comparison,#export-btn,#cornea-section .advanced',!advanced);
+  hide('#patient-summary,#patient-comparison,#outcome-panel,#export-btn,#cornea-section .advanced',!advanced);
+  hide('#retention-panel',!fitting);
+  hide('#retention-jump',!fitting);hide('#outcome-jump',!advanced);
   hide('.mode-tabs',!advanced);$('model-view-label').hidden=advanced;$('model-view-label').textContent=modelModes[model].name+' 모델';
   hide('#cornea-section',model==='ok');hide('#lens-section',model==='basic');hide('.fit-section,.scenario-bar',!fitting);
   hide('#recommend-btn',!advanced);hide('.analysis-column',mode==='lens');
@@ -292,7 +302,8 @@ const resizeObserver=new ResizeObserver(()=>{drawProfile();drawMap();});resizeOb
 syncInputs();
 try{viewer=createViewer($('viewer'),{corneaZ,lensZ,lensSag});}catch(error){console.error(error);$('viewer').textContent='이 브라우저에서 3D를 시작하지 못했습니다. 단면과 간격 지도를 확인해 주세요.';}
 recalculate();
-patientWorkspace=createPatientWorkspace({getParams:()=>params,getFit:()=>fit,toast,applyParams:next=>{const previous=params;params={...next};syncInputs();if(!recalculate()){params=previous;syncInputs();recalculate();return false;}clearPreset();return true;}});
+patientWorkspace=createPatientWorkspace({getParams:()=>params,getFit:()=>fit,toast,onRetentionChanged:()=>{updateViewer();if(fit){updateSceneLegend();retentionPanel?.update(fit.params,fit);}},applyParams:next=>{const previous=params;params={...next};syncInputs();if(!recalculate()){params=previous;syncInputs();recalculate();return false;}clearPreset();return true;}});
+retentionPanel=createRetentionPanel({getSettings:()=>patientWorkspace.getRetention(),onChange:settings=>{patientWorkspace.setRetention(settings);recalculate();}});
 $('reset-btn').addEventListener('click',()=>{patientWorkspace.resetMetadata();if(model!=='advanced')patientWorkspace.update(params,sampleFit(params));});
 selectModel(model);
 window.addEventListener('pagehide',()=>{viewer?.dispose();resizeObserver.disconnect();patientWorkspace?.dispose();});

@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import {createGeometrySampler} from './geometry.js?v=6';
+import {createGeometrySampler} from './geometry.js?v=7';
 
 // All model coordinates are millimetres. The model's anterior axis (z) is
 // Three's vertical axis (y); the camera is the only thing that is rotated.
@@ -363,6 +363,15 @@ export function createViewer(container, { corneaZ, lensZ, lensSag }) {
     }
 
     if (state.mode !== 'cornea') {
+      if(state.mode==='fit'&&state.retention?.axialMn>0){
+        // Only the axial contact-line component. Fixed arrow length is symbolic.
+        const ring=makeRing(radius,(x,y)=>lensPoint(x,y,.025),'#c88772',.9,true);ring.renderOrder=14;model.add(ring);
+        for(let i=0;i<12;i++){
+          const phi=i/12*TAU,point=lensPoint(radius*Math.cos(phi),radius*Math.sin(phi),.025);
+          const arrow=new THREE.ArrowHelper(new THREE.Vector3(0,-1,0),new THREE.Vector3(...point),.30,0xc88772,.09,.055);
+          arrow.renderOrder=14;model.add(arrow);
+        }
+      }
       const thickness = 0.14 * scale;
       const colorSample = heatmap ? (x, y) => {
         const worldX = x + cx;

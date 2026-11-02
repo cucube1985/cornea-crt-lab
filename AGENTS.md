@@ -14,7 +14,7 @@
 - The application uses buildless HTML, CSS, and JavaScript ES modules in `dist/`. `server.mjs` is a plain local static server for development (`npm start`, http://127.0.0.1:4173).
 - Use Node 24. Run `npm test` for geometry, patient and model checks before publishing application changes. Documentation-only changes do not require extra tests.
 - Keep asset and module URLs relative so they work under the `/cornea-crt-lab/` project path.
-- Browser asset/module URLs currently use a shared `?v=6` release suffix. Update it consistently on future releases to avoid mixing cached old geometry with new UI modules.
+- Browser asset/module URLs currently use a shared `?v=7` release suffix. Update it consistently on future releases to avoid mixing cached old geometry with new UI modules.
 - Measurements stay in the browser. Never add features that send patient data to a server, and never commit actual patient records.
 - Do not ship third-party recommendation formulas without the owner's permission; the calculator panel only parses results the user pastes.
 - Preserve the educational model assumptions, the not-a-medical-device notice and the trademark notice, and distinguish calculated geometry from clinically validated predictions.

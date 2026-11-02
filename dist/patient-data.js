@@ -1,9 +1,10 @@
-import {defaultParams,normalizeParams} from './geometry.js?v=6';
+import {defaultParams,normalizeParams} from './geometry.js?v=7';
+import {sanitizeRetention,sanitizeOutcome} from './fitting-effects.js?v=7';
 
 export const parameterLimits={flatK:[35,55],steepK:[35,55],steepAxis:[0,180],q:[-1.5,.5],bc:[7.5,10.5],rzd:[400,700],lza:[25,45],diameter:[10.5,11],offsetX:[-1,1],offsetY:[-1,1],tiltX:[-5,5],tiltY:[-5,5],clearance:[-.1,.5],seatTarget:[0,10],hvid:[8,15],vvid:[8,15],qFlat:[-1.5,.5],qSteep:[-1.5,.5],sag8Flat:[100,5000],sag8Steep:[100,5000],sag10Flat:[100,6000],sag10Steep:[100,6000],asymNT:[-200,200],asymSI:[-200,200],pupilDay:[1,10],pupilNight:[1,10],pupilX:[-2,2],pupilY:[-2,2],treatmentDiameter:[1,8],treatmentX:[-2,2],treatmentY:[-2,2]};
 export const optionalParameters=new Set(['qFlat','qSteep','sag8Flat','sag8Steep','sag10Flat','sag10Steep','treatmentDiameter']);
 export const sourceNames={assumed:'가정값',entered:'수기 입력',measured:'측정값 입력'};
-export const emptyMetadata=()=>({label:'가상 예제',axl:null,kind:'conditions',qMode:'q',qRange:'',vvidMeasured:false,treatmentSource:'assumed',sources:{size:'assumed',q:'assumed',rings:'assumed',asym:'assumed',pupil:'assumed'},ringForm:{kind:'sag',bfsRadius:null,apexElevation:null}});
+export const emptyMetadata=()=>({label:'가상 예제',axl:null,kind:'conditions',qMode:'q',qRange:'',vvidMeasured:false,treatmentSource:'assumed',sources:{size:'assumed',q:'assumed',rings:'assumed',asym:'assumed',pupil:'assumed'},ringForm:{kind:'sag',bfsRadius:null,apexElevation:null},retention:sanitizeRetention(),outcome:sanitizeOutcome(),kOnlyPreview:false});
 const text=(v,max)=>typeof v==='string'?v.slice(0,max):'';
 
 export function validateParameters(raw){
@@ -43,6 +44,7 @@ export function sanitizeRecord(raw){
   for(const key of Object.keys(meta.sources))if(Object.hasOwn(sourceNames,m.sources?.[key]))meta.sources[key]=m.sources[key];
   if(['sag8Flat','sag8Steep','sag10Flat','sag10Steep'].every(key=>input[key]===null))meta.sources.rings='assumed';
   meta.treatmentSource=m.treatmentSource==='measured'?'measured':'assumed';
+  meta.retention=sanitizeRetention(m.retention);meta.outcome=sanitizeOutcome(m.outcome);meta.kOnlyPreview=m.kOnlyPreview===true;
   // Keep only validated numbers and known fields; arbitrary imported metadata is dropped.
   if(m.ringForm&&['sag','bfs'].includes(m.ringForm.kind)){
     meta.ringForm.kind=m.ringForm.kind;
