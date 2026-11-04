@@ -42,3 +42,5 @@
 @media(max-width:730px){.recommend-grid{grid-template-columns:repeat(2,1fr)}}
 
 .page-footer{flex-wrap:wrap}.footer-legal{flex-basis:100%;font-size:9px;line-height:1.7;color:#a3afb6;word-break:keep-all}
+
+.page-heading h1{word-break:keep-all}

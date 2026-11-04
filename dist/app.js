@@ -1,6 +1,6 @@
 import {defaultParams,corneaZ,lensZ,lensSag,sampleFit} from './geometry.js?v=7';
 import {createViewer} from './renderer.js?v=7';
-import {calculatorLinks,resultFields,parseCalculatorText} from './recommend.js';
+import {calculatorLinks,resultFields,parseCalculatorText} from './recommend.js?v=7';
 import {createPatientWorkspace} from './patient-ui.js?v=7';
 import {modelModes,modelParameters} from './model-modes.js?v=7';
 import {retentionDefaults,capillaryLineForce} from './fitting-effects.js?v=7';
