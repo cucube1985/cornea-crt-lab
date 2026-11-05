@@ -2,9 +2,8 @@
 
 ## Source and deployment
 
-- On 2026-11-01 the user chose to remove login and publish the app publicly. This supersedes the earlier laptop-only login setup (still available in Git history before this change). GitHub Pages hosts the static app from `dist/`.
+- On 2026-11-05 the user chose local-only use and took the public site down. GitHub Pages is deleted and the `pages.yml` workflow is disabled. Do not re-enable either without a new explicit request. The repository remains as source storage.
 - Repository: https://github.com/cucube1985/cornea-crt-lab
-- Public app: https://cucube1985.github.io/cornea-crt-lab/
 - This directory is the application repository. The parent workspace may contain a separate Git repository; run Git commands from this directory or use `git -C` with this directory.
 - The default branch is `main`, tracking `origin/main`. Fetch and inspect local changes before integrating remote updates. Preserve existing work, including the external calculator results panel.
 - Use the existing GitHub workflow for this project. Do not create, synchronize, or deploy an OpenAI Sites project unless the user explicitly requests it. The retained `.openai/hosting.json` describes the earlier deployment and does not control GitHub Pages.
@@ -22,6 +21,4 @@
 ## Publishing
 
 - Review the intended changes and commit only files belonging to this project.
-- For an authorized release, push the intended source commit to `origin/main` using ordinary Git. Do not force-push.
-- The Pages workflow runs `npm test` and deploys `dist/` as the public app.
-- Verify the matching GitHub Actions run and report the GitHub Pages URL. If a push or deployment fails, report its actual status.
+- Push source commits to `origin/main` using ordinary Git when authorized. Do not force-push. Pushing does not publish a site.

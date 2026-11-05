@@ -1,10 +1,10 @@
 # CORNEA LAB
 
-각막 / CRT 렌즈 교육용 3D 기하 탐색기입니다. 로그인 없이 누구나 웹에서 사용할 수 있는 정적 웹 앱입니다.
+각막 / CRT 렌즈 교육용 3D 기하 탐색기입니다. 빌드 과정 없는 정적 웹 앱이며, 온라인으로 게시하지 않고 로컬에서만 실행합니다.
 
-## 온라인
+## 게시 상태
 
-https://cucube1985.github.io/cornea-crt-lab/
+2026-11-05부터 GitHub Pages 게시를 중단했습니다. 이 저장소는 소스 보관용입니다.
 
 모든 계산과 측정값 처리는 각자의 브라우저 안에서만 이루어지며, 서버나 GitHub로 전송되지 않습니다. 환자 비교 설정을 "이 기기에 보관"하면 그 브라우저의 저장 공간에만 남으므로 공용 기기에서는 보관하지 말고, 이름·차트번호 대신 별칭을 사용합니다.
 
@@ -15,7 +15,7 @@ npm start   # http://127.0.0.1:4173
 npm test
 ```
 
-`main`에 푸시하면 GitHub Actions가 테스트 후 `dist/`를 GitHub Pages에 게시합니다. ES module과 WebGL을 사용하므로 HTML 파일을 직접 여는 대신 HTTP로 실행합니다.
+ES module과 WebGL을 사용하므로 HTML 파일을 직접 여는 대신 `npm start`로 실행합니다. GitHub Pages 배포 워크플로는 비활성화되어 있어 `main`에 푸시해도 게시되지 않습니다.
 
 빌드 과정 없이 Node 24와 정적 ES module/WebGL을 사용합니다. Three.js 0.170.0은 로컬 vendor에 포함하고 MIT 라이선스를 동봉했습니다. 폰트는 Google Fonts에서 로드하며 오프라인에서는 시스템 폰트로 표시합니다.
 
